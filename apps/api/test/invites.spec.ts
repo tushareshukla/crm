@@ -12,6 +12,7 @@ import {
 	deleteUsersAt,
 	errorOf,
 	mutate,
+	type ProcedureInput,
 	query,
 	signUp,
 	startApp,
@@ -58,7 +59,7 @@ let member: TestUser;
 let rivalOwner: TestUser;
 let root: TestUser;
 
-const create = (as: TestUser, input: unknown, org = acme.slug) =>
+const create = (as: TestUser, input: ProcedureInput, org = acme.slug) =>
 	mutate(app, "invites.create", input, { as, org });
 
 const list = async (as: TestUser, org = acme.slug) =>

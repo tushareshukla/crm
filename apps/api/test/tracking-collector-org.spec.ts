@@ -137,7 +137,7 @@ describe("GET /api/t/config/:siteId", () => {
 			siteId: SITES.a,
 			hosts: [{ host: HOSTS.a, scope: "SITE_AND_SUBDOMAINS" }],
 		});
-		expect(typeof a.body.hash).toBe("string");
+		expect(a.body.hash).toEqual(expect.any(String));
 
 		const b = await request(app.getHttpServer())
 			.get(`/api/t/config/${SITES.b}`)

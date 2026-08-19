@@ -11,6 +11,7 @@ import {
 	isMemberOf,
 	ORGANIZATION_ATTRIBUTE,
 	ORGANIZATION_SLUG_HEADER,
+	organizationAttribute,
 	organizationIdBySlug,
 } from "../lib/tenant";
 
@@ -33,10 +34,8 @@ export async function resolveOrganization(
 	attributes: Attributes,
 	slugHeader: string | null,
 ): Promise<Attributes | null> {
-	const claimed = attributes[ORGANIZATION_ATTRIBUTE];
-	if (typeof claimed === "string" && claimed.trim()) {
-		return { ...attributes, [ORGANIZATION_ATTRIBUTE]: claimed.trim() };
-	}
+	const claimed = organizationAttribute(attributes);
+	if (claimed) return { ...attributes, [ORGANIZATION_ATTRIBUTE]: claimed };
 
 	const slug = slugHeader?.trim();
 	if (!slug) return attributes;

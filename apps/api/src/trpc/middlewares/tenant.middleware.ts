@@ -80,13 +80,13 @@ export class TenantMiddleware implements TRPCMiddleware {
 		this.touched.set(key, now);
 		if (this.touched.size > 10_000) this.touched.clear();
 
-		void touchMembership(userId, organizationId).catch((error: unknown) => {
+		void touchMembership(userId, organizationId).catch((cause: unknown) => {
 			this.touched.delete(key);
 			this.logger.warn({
 				message: "Could not record member activity",
 				userId,
 				organizationId,
-				reason: error instanceof Error ? error.message : String(error),
+				reason: cause instanceof Error ? cause.message : String(cause),
 			});
 		});
 	}

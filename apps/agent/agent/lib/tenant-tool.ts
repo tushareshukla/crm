@@ -1,11 +1,9 @@
-import { defineTool as defineEveTool, type ToolContext } from "eve/tools";
+import {
+	defineTool as defineEveTool,
+	type ToolContext,
+	type ToolDefinition,
+} from "eve/tools";
 import { inSessionTenant } from "./tenant";
-
-type AnyToolDefinition = {
-	execute: (input: unknown, ctx: ToolContext) => unknown;
-	approval?: unknown;
-	toModelOutput?: unknown;
-};
 
 /**
  * The same as eve's defineTool, except the tool runs inside the organization
@@ -14,11 +12,11 @@ type AnyToolDefinition = {
  * can touch a tenant model outside the session's organization, and a session
  * that names none fails closed on its first query.
  */
-export const defineTool: typeof defineEveTool = ((
-	definition: AnyToolDefinition,
+export const defineTool: typeof defineEveTool = (<TInput, TOutput>(
+	definition: ToolDefinition<TInput, TOutput>,
 ) =>
 	defineEveTool({
 		...definition,
-		execute: (input: unknown, ctx: ToolContext) =>
+		execute: (input: TInput, ctx: ToolContext) =>
 			inSessionTenant(ctx, () => definition.execute(input, ctx)),
 	} as never)) as typeof defineEveTool;

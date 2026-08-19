@@ -140,31 +140,32 @@ function scopeNestedWrites(
 		}
 		if ("upsert" in next) {
 			const up = next.upsert;
-			const one = (u: unknown) =>
-				isObject(u)
-					? {
-							...u,
-							...(isObject(u.where)
-								? { where: compoundWhere(target, u.where, org) }
-								: {}),
-							create: scopeCreate(target, u.create, org),
-							update: scopeUpdateData(target, u.update, org),
-						}
-					: u;
+			const one = (u: unknown) => {
+				if (!isObject(u)) return u;
+				const scoped: AnyRecord = {
+					...u,
+					create: scopeCreate(target, u.create, org),
+					update: scopeUpdateData(target, u.update, org),
+				};
+				if (isObject(u.where))
+					scoped.where = compoundWhere(target, u.where, org);
+				return scoped;
+			};
 			next.upsert = Array.isArray(up) ? up.map(one) : one(up);
 		}
 		if ("update" in next) {
 			const up = next.update;
-			const one = (u: unknown) =>
-				isObject(u) && ("where" in u || "data" in u)
-					? {
-							...u,
-							...(isObject(u.where)
-								? { where: compoundWhere(target, u.where, org) }
-								: {}),
-							data: scopeUpdateData(target, u.data, org),
-						}
-					: scopeUpdateData(target, u, org);
+			const one = (u: unknown) => {
+				if (!isObject(u) || !("where" in u || "data" in u))
+					return scopeUpdateData(target, u, org);
+				const scoped: AnyRecord = {
+					...u,
+					data: scopeUpdateData(target, u.data, org),
+				};
+				if (isObject(u.where))
+					scoped.where = compoundWhere(target, u.where, org);
+				return scoped;
+			};
 			next.update = Array.isArray(up) ? up.map(one) : one(up);
 		}
 		// connect / disconnect / set to a record of another org must fail: pin the org on the unique where.

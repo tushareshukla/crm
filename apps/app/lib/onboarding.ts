@@ -48,9 +48,12 @@ async function read(
 
 	if (!cookie) return null;
 
+	const headers = new Headers({ cookie });
+	if (slug) headers.set(ORG_SLUG_HEADER, slug);
+
 	try {
 		const response = await fetch(`${API_URL}/api/trpc/${procedure}`, {
-			headers: { cookie, ...(slug ? { [ORG_SLUG_HEADER]: slug } : {}) },
+			headers,
 			cache: "no-store",
 			signal: AbortSignal.timeout(GATE_TIMEOUT_MS),
 		});

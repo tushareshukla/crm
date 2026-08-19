@@ -56,7 +56,7 @@ const LIMITS: {
 	},
 ];
 
-function toDraft(limits: Limits): Record<LimitKey, string> {
+function toDraft(limits: Limits) {
 	return {
 		maxMembers: limits.maxMembers?.toString() ?? "",
 		maxContacts: limits.maxContacts?.toString() ?? "",

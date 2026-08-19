@@ -59,13 +59,13 @@ const STATUS_BY_CODE = new Map<string, number>([
 ]);
 
 /** Translate a better-auth failure into an HTTP exception the tRPC layer maps onto a code. */
-export function fromAuthError(error: unknown, fallback: string): never {
-	if (error instanceof APIError) {
+export function fromAuthError(cause: unknown, fallback: string): never {
+	if (cause instanceof APIError) {
 		const status =
-			STATUS_BY_CODE.get(error.body?.code ?? "") ?? error.statusCode;
-		throw new HttpException(error.body?.message ?? fallback, status);
+			STATUS_BY_CODE.get(cause.body?.code ?? "") ?? cause.statusCode;
+		throw new HttpException(cause.body?.message ?? fallback, status);
 	}
-	if (error instanceof HttpException) throw error;
+	if (cause instanceof HttpException) throw cause;
 	throw new InternalServerErrorException(fallback);
 }
 

@@ -168,10 +168,11 @@ export function CreateOrganizationDialog() {
 										value={values.name}
 										onChange={(event) => {
 											const name = event.target.value;
-											edit({
-												name,
-												...(slugEdited.current ? {} : { slug: slugify(name) }),
-											});
+											edit(
+												slugEdited.current
+													? { name }
+													: { name, slug: slugify(name) },
+											);
 										}}
 										placeholder="Acme Inc."
 										autoComplete="organization"

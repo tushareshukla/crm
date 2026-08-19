@@ -35,6 +35,13 @@ import type {
 	UpdateWorkspaceInput,
 } from "./workspace.contracts";
 
+/** The fields an update actually changed — what the audit log records. */
+type WorkspaceChanges = {
+	name?: string;
+	slug?: string;
+	website?: string;
+};
+
 export interface Workspace {
 	id: string;
 	slug: string;
@@ -172,15 +179,16 @@ export class WorkspaceService {
 
 		this.logger.log({ message: "Workspace updated", userId });
 
+		const changed: WorkspaceChanges = {};
+		if (before?.name !== input.name) changed.name = input.name;
+		if (before?.slug !== slug) changed.slug = slug;
+		if (before?.website !== website) changed.website = website;
+
 		await this.audit.tryRecord({
 			type: "org.updated",
 			actorId: userId,
 			subject: workspaceId(),
-			data: {
-				...(before?.name !== input.name ? { name: input.name } : {}),
-				...(before?.slug !== slug ? { slug } : {}),
-				...(before?.website !== website ? { website } : {}),
-			},
+			data: changed,
 		});
 
 		if (website !== before?.website) {

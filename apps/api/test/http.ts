@@ -88,6 +88,17 @@ export type CallOptions = {
 	org?: string | null;
 };
 
+type JsonValue =
+	| string
+	| number
+	| boolean
+	| null
+	| JsonValue[]
+	| { [key: string]: JsonValue };
+
+/** The JSON a procedure is called with; the procedure's own schema judges it on the other side. */
+export type ProcedureInput = { [key: string]: JsonValue };
+
 function decorate<T extends request.Test>(req: T, options: CallOptions): T {
 	if (options.as) req.set("cookie", options.as.cookie);
 	if (options.org) req.set(ORG_SLUG_HEADER, options.org);
@@ -98,7 +109,7 @@ function decorate<T extends request.Test>(req: T, options: CallOptions): T {
 export function query(
 	app: INestApplication,
 	path: string,
-	input?: unknown,
+	input?: ProcedureInput,
 	options: CallOptions = {},
 ): request.Test {
 	const url =
@@ -113,7 +124,7 @@ export function query(
 export function mutate(
 	app: INestApplication,
 	path: string,
-	input?: unknown,
+	input?: ProcedureInput,
 	options: CallOptions = {},
 ): request.Test {
 	const req = request(app.getHttpServer())

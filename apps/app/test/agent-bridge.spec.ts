@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import { verifyJwtHmac } from "eve/channels/auth";
+import { z } from "zod";
 
 const SECRET = "test-secret-at-least-long-enough-to-be-a-secret";
 
@@ -25,9 +26,22 @@ const rep = {
 
 const scope = { organizationId: "org_acme" };
 
-function claimsOf(token: string): Record<string, unknown> {
+/** The claims a bridge token carries (see BridgeClaims in lib/agent-bridge). */
+const bridgeClaims = z.object({
+	sub: z.string(),
+	organizationId: z.string(),
+	contactId: z.string().optional(),
+	companyId: z.string().optional(),
+	dealId: z.string().optional(),
+	iat: z.number(),
+	exp: z.number(),
+});
+
+function claimsOf(token: string) {
 	const [, payload] = token.split(".");
-	return JSON.parse(Buffer.from(payload as string, "base64url").toString());
+	return bridgeClaims.parse(
+		JSON.parse(Buffer.from(payload as string, "base64url").toString()),
+	);
 }
 
 describe("mintBridgeToken", () => {
@@ -96,7 +110,7 @@ describe("mintBridgeToken", () => {
 
 	it("expires, so a token left in a tab stops working", async () => {
 		const token = await mintBridgeToken(rep, scope);
-		const claims = claimsOf(token) as { exp: number; iat: number };
+		const claims = claimsOf(token);
 
 		const lifetime = claims.exp - claims.iat;
 		expect(lifetime).toBeLessThanOrEqual(300);

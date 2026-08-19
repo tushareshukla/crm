@@ -38,7 +38,11 @@ import { attribute } from "../lib/session-purpose";
 import { createSlackChannel } from "../lib/slack-membership";
 import { reconcileStaleTasks } from "../lib/stale-tasks";
 import { completeTask, taskSubject } from "../lib/tasks";
-import { inSessionTenant, organizationFromRequest } from "../lib/tenant";
+import {
+	inSessionTenant,
+	organizationFromRequest,
+	requestBodyOrganization,
+} from "../lib/tenant";
 
 const TASK_MARKER = "task:";
 const STALE_QUEUE_MS = DISPATCH.sweep.staleQueueMs;
@@ -223,7 +227,10 @@ export default defineChannel({
 				);
 			}
 
-			const organizationId = await organizationFromRequest(request, body);
+			const organizationId = await organizationFromRequest(
+				request,
+				requestBodyOrganization.parse(body),
+			);
 			if (!organizationId) {
 				return Response.json(
 					{ error: "This request names no organization." },

@@ -35,10 +35,11 @@ export function getServerTrpcClient(): TRPCClient<AppRouter> {
 						requestOrgSlug(),
 					]);
 
-					return {
-						...(cookie ? { cookie } : {}),
-						...(slug ? { [ORG_SLUG_HEADER]: slug } : {}),
-					};
+					const requestHeaders = new Headers();
+					if (cookie) requestHeaders.set("cookie", cookie);
+					if (slug) requestHeaders.set(ORG_SLUG_HEADER, slug);
+
+					return requestHeaders;
 				},
 			}),
 		],

@@ -1,6 +1,6 @@
 import { describe, expect } from "bun:test";
 import type { WorkspaceRole } from "@crm/auth";
-import type { Db } from "@crm/db";
+import type { Db, Prisma } from "@crm/db";
 import type { AgentAccessService } from "../src/agent/agent-access.service";
 import type { AgentTriggerService } from "../src/agent/agent-trigger.service";
 import type { SlackChannelsService } from "../src/slack/slack-channels.service";
@@ -37,7 +37,7 @@ function serviceFor(input: {
 	const requested: Array<{ reason: string; required: boolean | undefined }> =
 		[];
 	const deleted: string[] = [];
-	const seen: { membersArgs?: unknown } = {};
+	const memberQueries: Prisma.MemberFindManyArgs[] = [];
 	const tx = {
 		account: {
 			deleteMany: async () => {
@@ -77,8 +77,8 @@ function serviceFor(input: {
 		},
 		member: {
 			count: async () => input.memberCount ?? 0,
-			findMany: async (args: unknown) => {
-				seen.membersArgs = args;
+			findMany: async (args: Prisma.MemberFindManyArgs) => {
+				memberQueries.push(args);
 				return input.members ?? [];
 			},
 		},
@@ -100,7 +100,7 @@ function serviceFor(input: {
 		service: new SlackConnectionService(db, agent, channels, access),
 		requested,
 		deleted,
-		seen,
+		memberQueries,
 	};
 }
 
@@ -149,7 +149,7 @@ describe("Slack connection", () => {
 	});
 
 	it("returns only real CRM members and their stored exact-email matches", async () => {
-		const { service, seen } = serviceFor({
+		const { service, memberQueries } = serviceFor({
 			members: [
 				{
 					user: {
@@ -205,7 +205,8 @@ describe("Slack connection", () => {
 
 		// Members and their matches are this organization's only: a user who is
 		// in several organizations has one match row per organization.
-		expect(seen.membersArgs).toMatchObject({
+		expect(memberQueries).toHaveLength(1);
+		expect(memberQueries[0]).toMatchObject({
 			where: { organizationId: TEST_ORG.id },
 			select: {
 				user: {

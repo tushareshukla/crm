@@ -64,6 +64,24 @@
 				"anti-slop/no-unknown-parameters": "off",
 				"anti-slop/no-runtime-typeof": "off"
 			}
+		},
+		{
+			"files": [
+				"packages/db/src/tenant.ts",
+				"packages/db/src/tenant-extension.ts",
+				"packages/db/src/tenant-map.generated.ts",
+				"packages/db/src/client.ts",
+				"packages/db/scripts/**"
+			],
+			"rules": {
+				"anti-slop/no-unsafe-dictionary-type": "off",
+				"anti-slop/no-unknown-parameters": "off",
+				"anti-slop/no-runtime-typeof": "off",
+				"anti-slop/no-known-value-widening": "off",
+				"anti-slop/no-widen-then-assert": "off",
+				"anti-slop/no-chained-type-assertions": "off",
+				"anti-slop/no-object-parameters": "off"
+			}
 		}
 	]
 }

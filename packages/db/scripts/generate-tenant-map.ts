@@ -6,6 +6,7 @@
  *  - the compound unique keys that include organizationId (for findUnique rewrites)
  * Run: bun scripts/generate-tenant-map.ts   (also wired into `db:generate`)
  */
+import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -118,8 +119,13 @@ export const TENANT_FK_SCALARS: Record<TenantModel, readonly string[]> = ${JSON.
 /** compound unique keys that include organizationId, per tenant model. */
 export const TENANT_COMPOUND_UNIQUES: Record<TenantModel, readonly (readonly string[])[]> = ${JSON.stringify(compoundUniques, null, 1)} as never;
 `;
-writeFileSync(
-	join(import.meta.dir, "..", "src", "tenant-map.generated.ts"),
-	out,
-);
+const file = join(import.meta.dir, "..", "src", "tenant-map.generated.ts");
+writeFileSync(file, out);
+
+// Write what `biome check` accepts, so a regenerated map never turns lint red.
+const formatted = spawnSync("bunx", ["biome", "format", "--write", file], {
+	stdio: "inherit",
+});
+if (formatted.status !== 0) process.exit(formatted.status ?? 1);
+
 console.log(`tenant map: ${tenantModels.length} models`);

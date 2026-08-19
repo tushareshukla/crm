@@ -10,6 +10,7 @@ import {
 	deleteUsersAt,
 	errorOf,
 	mutate,
+	type ProcedureInput,
 	query,
 	signUp,
 	startApp,
@@ -72,10 +73,10 @@ let owner: TestUser;
 /** Organizations created through the console, deleted in afterAll. */
 const createdIds = new Set<string>();
 
-const adminQuery = (as: TestUser, path: string, input?: unknown) =>
+const adminQuery = (as: TestUser, path: string, input?: ProcedureInput) =>
 	query(app, `admin.${path}`, input, { as });
 
-const adminMutate = (as: TestUser, path: string, input?: unknown) =>
+const adminMutate = (as: TestUser, path: string, input?: ProcedureInput) =>
 	mutate(app, `admin.${path}`, input, { as });
 
 const organizationRow = (id: string) =>

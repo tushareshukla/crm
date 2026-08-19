@@ -1,4 +1,10 @@
-import { db, runWithTenant, tenantIdOrNull, withoutTenant } from "@crm/db";
+import {
+	db,
+	type Prisma,
+	runWithTenant,
+	tenantIdOrNull,
+	withoutTenant,
+} from "@crm/db";
 import { z } from "zod";
 
 /**
@@ -34,18 +40,23 @@ export type TenantContext = {
 
 const attributeText = z.string().trim().min(1).nullable().catch(null);
 
+/** The organization a set of auth attributes names, or null when it names none. */
+export function organizationAttribute(
+	attributes: SessionAttributes | undefined,
+): string | null {
+	return attributeText.parse(attributes?.[ORGANIZATION_ATTRIBUTE]);
+}
+
 /**
  * The organization a session belongs to: the one it was started in. A later
  * caller who presents another organization is refused rather than silently
  * moved, so a session's history can never be read from the wrong tenant.
  */
 export function sessionOrganizationId(ctx: TenantContext): string | null {
-	const initiator = attributeText.parse(
-		ctx.session.auth.initiator?.attributes[ORGANIZATION_ATTRIBUTE],
+	const initiator = organizationAttribute(
+		ctx.session.auth.initiator?.attributes,
 	);
-	const current = attributeText.parse(
-		ctx.session.auth.current?.attributes[ORGANIZATION_ATTRIBUTE],
-	);
+	const current = organizationAttribute(ctx.session.auth.current?.attributes);
 
 	if (initiator && current && initiator !== current) {
 		throw new Error("This session belongs to another organization.");
@@ -101,9 +112,12 @@ export function withOrganization<
 export const ORGANIZATION_ID_HEADER = "x-organization-id";
 export const ORGANIZATION_SLUG_HEADER = "x-org-slug";
 
-const bodyOrganization = z
+/** The `organizationId` a JSON body names; parse the decoded body with it where the request is read. */
+export const requestBodyOrganization = z
 	.object({ organizationId: attributeText })
 	.catch({ organizationId: null });
+
+export type RequestBodyOrganization = z.infer<typeof requestBodyOrganization>;
 
 /**
  * The organization an internal bridge request (`/internal/crm/*`, authorised
@@ -113,11 +127,11 @@ const bodyOrganization = z
  */
 export async function organizationFromRequest(
 	request: Request,
-	body?: unknown,
+	body: RequestBodyOrganization = { organizationId: null },
 ): Promise<string | null> {
 	const id =
 		attributeText.parse(request.headers.get(ORGANIZATION_ID_HEADER)) ??
-		bodyOrganization.parse(body).organizationId;
+		body.organizationId;
 	if (id) {
 		const row = await db.organization.findUnique({
 			where: { id },
@@ -164,25 +178,12 @@ const limitsShape = z
 	.catch({ agentTasksPerDay: null });
 
 /** The organization's daily agent task cap (`limits.agentTasksPerDay`), or the platform default. */
-export function agentTasksPerDay(limits: unknown): number {
+export function agentTasksPerDay(limits: Prisma.JsonValue | null): number {
 	return (
 		limitsShape.parse(limits ?? {}).agentTasksPerDay ??
 		DEFAULT_AGENT_TASKS_PER_DAY
 	);
 }
-
-export type OrgSettingKey =
-	| "contextDevApiKey"
-	| "perplexityApiKey"
-	| "agentModelId"
-	| "agentModelContextWindow";
-
-const ENV_FOR: Readonly<Record<OrgSettingKey, string | null>> = {
-	contextDevApiKey: "CONTEXT_DEV_API_KEY",
-	perplexityApiKey: "PERPLEXITY_API_KEY",
-	agentModelId: null,
-	agentModelContextWindow: null,
-};
 
 const settingText = z
 	.union([z.string(), z.number()])
@@ -191,18 +192,39 @@ const settingText = z
 	.nullable()
 	.catch(null);
 
-const settingsShape = z.record(z.string(), z.unknown()).catch({});
+/** What a platform admin may set on `Organization.settings`; anything else there is ignored. */
+const settingsShape = z
+	.object({
+		contextDevApiKey: settingText,
+		perplexityApiKey: settingText,
+		agentModelId: settingText,
+		agentModelContextWindow: settingText,
+	})
+	.catch({
+		contextDevApiKey: null,
+		perplexityApiKey: null,
+		agentModelId: null,
+		agentModelContextWindow: null,
+	});
+
+type OrgSettings = z.infer<typeof settingsShape>;
+
+export type OrgSettingKey = keyof OrgSettings;
+
+const ENV_FOR = {
+	contextDevApiKey: "CONTEXT_DEV_API_KEY",
+	perplexityApiKey: "PERPLEXITY_API_KEY",
+	agentModelId: null,
+	agentModelContextWindow: null,
+} satisfies Readonly<Record<OrgSettingKey, string | null>>;
 
 const SETTINGS_TTL_MS = 15_000;
 
-const settingsCache = new Map<
-	string,
-	{ at: number; settings: Record<string, unknown> }
->();
+const settingsCache = new Map<string, { at: number; settings: OrgSettings }>();
 
 async function organizationSettings(
 	organizationId: string,
-): Promise<Record<string, unknown>> {
+): Promise<OrgSettings> {
 	const cached = settingsCache.get(organizationId);
 	if (cached && Date.now() - cached.at < SETTINGS_TTL_MS) {
 		return cached.settings;
@@ -243,9 +265,7 @@ export async function resolveOrgSetting(
 
 	if (organizationId) {
 		try {
-			const override = settingText.parse(
-				(await organizationSettings(organizationId))[key],
-			);
+			const override = (await organizationSettings(organizationId))[key];
 			if (override) return override;
 		} catch (error) {
 			console.error(

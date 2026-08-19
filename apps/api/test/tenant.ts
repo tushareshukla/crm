@@ -150,9 +150,7 @@ export function afterEach(fn: Body): void {
 }
 
 /** Headers that name the organization for a tRPC / REST request. */
-export function orgHeaders(
-	slug: string = TEST_ORG.slug,
-): Record<string, string> {
+export function orgHeaders(slug: string = TEST_ORG.slug) {
 	return { [ORG_SLUG_HEADER]: slug };
 }
 

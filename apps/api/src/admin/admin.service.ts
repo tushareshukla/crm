@@ -41,6 +41,14 @@ export interface PlatformAdmin {
 	headers: Headers;
 }
 
+/** The fields an update actually changed — what the audit log records. */
+type OrganizationChanges = {
+	name?: string;
+	slug?: string;
+	logo?: string | null;
+	limits?: OrgLimits;
+};
+
 /** Pending-invite count only counts unexpired ones; the cut-off moves, so the select is built per call. */
 function orgSelect() {
 	return {
@@ -170,7 +178,7 @@ export class AdminService {
 	): Promise<AdminOrganization> {
 		const before = await this.read(input.id);
 		const data: Prisma.OrganizationUpdateInput = {};
-		const changed: Record<string, unknown> = {};
+		const changed: OrganizationChanges = {};
 
 		if (input.name !== undefined && input.name !== before.name) {
 			data.name = input.name;
@@ -204,7 +212,7 @@ export class AdminService {
 			type: "org.updated",
 			actorId: admin.id,
 			subject: input.id,
-			data: changed as Prisma.InputJsonObject,
+			data: changed,
 		});
 
 		this.logger.log({
@@ -349,10 +357,10 @@ function validSlug(slug: string): string {
 	return slug;
 }
 
-function slugTaken(error: unknown): ConflictException | null {
+function slugTaken(cause: unknown): ConflictException | null {
 	if (
-		error instanceof Prisma.PrismaClientKnownRequestError &&
-		error.code === "P2002"
+		cause instanceof Prisma.PrismaClientKnownRequestError &&
+		cause.code === "P2002"
 	) {
 		return new ConflictException(
 			"That address is taken by another organization.",

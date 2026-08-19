@@ -149,7 +149,8 @@ export class AuditService {
 		const take = input.limit;
 		const rows = await this.db.auditEvent.findMany({
 			take: take + 1,
-			...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
+			cursor: input.cursor ? { id: input.cursor } : undefined,
+			skip: input.cursor ? 1 : undefined,
 			orderBy: [{ createdAt: "desc" }, { id: "desc" }],
 			select: AUDIT_SELECT,
 		});

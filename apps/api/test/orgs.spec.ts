@@ -5,6 +5,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { db, withoutTenant } from "@crm/db";
 import type { INestApplication } from "@nestjs/common";
+import type { OrgSummary } from "../src/orgs/orgs.service";
 import {
 	dataOf,
 	deleteUsersAt,
@@ -155,7 +156,7 @@ describe("orgs.mine", () => {
 
 describe("orgs.get", () => {
 	it("describes an organization to one of its members", async () => {
-		const org = dataOf<Record<string, unknown>>(
+		const org = dataOf<OrgSummary>(
 			await query(app, "orgs.get", { slug: beta.slug }, { as: rep }),
 		);
 

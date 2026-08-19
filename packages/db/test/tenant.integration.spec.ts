@@ -4,6 +4,7 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { db } from "../src/client";
+import { Prisma } from "../src/generated/prisma/client";
 import {
 	currentTenantId,
 	runWithTenant,
@@ -210,10 +211,9 @@ describe("tenant extension", () => {
 describe("tenant extension — adversarial", () => {
 	beforeAll(reset);
 
-	const isNotFound = (error: unknown) =>
-		typeof error === "object" &&
-		error !== null &&
-		(error as { code?: unknown }).code === "P2025";
+	const isNotFound = (cause: unknown) =>
+		cause instanceof Prisma.PrismaClientKnownRequestError &&
+		cause.code === "P2025";
 
 	test("updateMany / deleteMany only touch the current org, even with a forged filter", async () => {
 		await runWithTenant(A.id, () =>
@@ -451,11 +451,11 @@ describe("tenant extension — adversarial", () => {
 			() => db.company.delete({ where: { id: aCompany.id } }),
 		];
 		for (const attempt of attempts) {
-			const error = await runWithTenant(B.id, attempt).then(
+			const outcome = await runWithTenant(B.id, attempt).then(
 				() => null,
-				(e: unknown) => e,
+				(cause: unknown) => cause,
 			);
-			expect(isNotFound(error)).toBe(true);
+			expect(isNotFound(outcome)).toBe(true);
 		}
 
 		const stillThere = await runWithTenant(A.id, () =>
