@@ -1,4 +1,4 @@
-import { EnrichmentStatus } from "@crm/db";
+import { currentTenantId, EnrichmentStatus } from "@crm/db";
 import { lockIdempotencyKey } from "@crm/db/idempotency";
 import { Injectable, Logger } from "@nestjs/common";
 import { AgentTriggerService } from "../agent/agent-trigger.service";
@@ -20,7 +20,12 @@ export class CompanyDirectoryService {
 		const outcome = await this.agent.withCrmEvents(async (tx, emit) => {
 			await lockIdempotencyKey(tx, `company-directory:${domain}`);
 			const existing = await tx.company.findUnique({
-				where: { domain },
+				where: {
+					organizationId_domain: {
+						organizationId: currentTenantId(),
+						domain: domain,
+					},
+				},
 				select: { id: true },
 			});
 			if (existing) return { id: existing.id, created: false as const };

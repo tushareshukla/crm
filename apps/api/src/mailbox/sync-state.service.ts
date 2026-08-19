@@ -1,4 +1,5 @@
 import {
+	currentTenantId,
 	type Db,
 	GoogleSyncStatus,
 	type MailboxSyncModel as MailboxSync,
@@ -18,7 +19,13 @@ export class SyncStateService {
 
 	async get(userId: string, source: SyncSource): Promise<MailboxSync | null> {
 		return this.db.mailboxSync.findUnique({
-			where: { userId_source: { userId, source } },
+			where: {
+				organizationId_userId_source: {
+					organizationId: currentTenantId(),
+					userId,
+					source,
+				},
+			},
 		});
 	}
 
@@ -64,7 +71,13 @@ export class SyncStateService {
 		options: { autoCreate: boolean },
 	): Promise<MailboxSync> {
 		return this.db.mailboxSync.upsert({
-			where: { userId_source: { userId, source } },
+			where: {
+				organizationId_userId_source: {
+					organizationId: currentTenantId(),
+					userId,
+					source,
+				},
+			},
 			create: {
 				userId,
 				source,

@@ -1,5 +1,5 @@
 import type { Db } from "@crm/db";
-import { SETTINGS_ID } from "@crm/db/settings";
+import { settingsId } from "@crm/db/settings";
 import {
 	configHash,
 	mintSiteId,
@@ -50,7 +50,7 @@ export class TrackingConfigService {
 
 	private async current(hash: string): Promise<boolean> {
 		const row = await this.db.appSetting.findUnique({
-			where: { id: SETTINGS_ID },
+			where: { id: settingsId() },
 			select: { trackingConfigHash: true },
 		});
 
@@ -72,7 +72,7 @@ export class TrackingConfigService {
 
 		if (!config) {
 			await this.db.appSetting.updateMany({
-				where: { id: SETTINGS_ID },
+				where: { id: settingsId() },
 				data: { trackingConfigHash: null },
 			});
 
@@ -82,7 +82,7 @@ export class TrackingConfigService {
 		const hash = configHash(config);
 
 		await this.db.appSetting.update({
-			where: { id: SETTINGS_ID },
+			where: { id: settingsId() },
 			data: { trackingConfigHash: hash },
 		});
 
@@ -94,7 +94,7 @@ export class TrackingConfigService {
 
 	async ensureSiteId(): Promise<string> {
 		const existing = await this.db.appSetting.findUnique({
-			where: { id: SETTINGS_ID },
+			where: { id: settingsId() },
 			select: { trackingSiteId: true },
 		});
 
@@ -103,8 +103,8 @@ export class TrackingConfigService {
 		const trackingSiteId = mintSiteId();
 
 		await this.db.appSetting.upsert({
-			where: { id: SETTINGS_ID },
-			create: { id: SETTINGS_ID, trackingSiteId },
+			where: { id: settingsId() },
+			create: { id: settingsId(), trackingSiteId },
 			update: { trackingSiteId },
 		});
 
@@ -119,8 +119,8 @@ export class TrackingConfigService {
 		const trackingSiteId = mintSiteId();
 
 		await this.db.appSetting.upsert({
-			where: { id: SETTINGS_ID },
-			create: { id: SETTINGS_ID, trackingSiteId },
+			where: { id: settingsId() },
+			create: { id: settingsId(), trackingSiteId },
 			update: { trackingSiteId },
 		});
 

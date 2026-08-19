@@ -1,4 +1,4 @@
-import { db } from "@crm/db";
+import { currentTenantId, db } from "@crm/db";
 import { lockIdempotencyKey } from "@crm/db/idempotency";
 import type { OauthAccess } from "@crm/validation";
 import { SLACK_PROVIDER_ID } from "./scopes";
@@ -17,7 +17,12 @@ export async function rememberSlackInstall(grant: OauthAccess): Promise<void> {
 	};
 
 	await db.slackInstallation.upsert({
-		where: { installerId: installer.id },
+		where: {
+			organizationId_installerId: {
+				organizationId: currentTenantId(),
+				installerId: installer.id,
+			},
+		},
 		create: { installerId: installer.id, ...install },
 		update: install,
 	});
@@ -37,12 +42,22 @@ export async function replaceSlackConnection(account: {
 		});
 
 		const install = await tx.slackInstallation.findUnique({
-			where: { installerId: account.accountId },
+			where: {
+				organizationId_installerId: {
+					organizationId: currentTenantId(),
+					installerId: account.accountId,
+				},
+			},
 		});
 		if (!install) return;
 
 		await tx.slackInstallation.delete({
-			where: { installerId: account.accountId },
+			where: {
+				organizationId_installerId: {
+					organizationId: currentTenantId(),
+					installerId: account.accountId,
+				},
+			},
 		});
 
 		await tx.slackWorkspaceGrant.deleteMany({
@@ -58,7 +73,12 @@ export async function replaceSlackConnection(account: {
 		};
 
 		await tx.slackWorkspaceGrant.upsert({
-			where: { teamId: install.teamId },
+			where: {
+				organizationId_teamId: {
+					organizationId: currentTenantId(),
+					teamId: install.teamId,
+				},
+			},
 			create: { teamId: install.teamId, ...grant },
 			update: grant,
 		});

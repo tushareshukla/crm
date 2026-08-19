@@ -1,5 +1,11 @@
 import { isGoogleConfigured, signsInWithGoogle } from "@crm/auth";
-import { type Db, GoogleSyncStatus, type Prisma } from "@crm/db";
+import {
+	currentTenantId,
+	type Db,
+	GoogleSyncStatus,
+	type Prisma,
+	type Tx,
+} from "@crm/db";
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { normalizeDomain } from "../companies/domain";
 import { ActivityStampService } from "../crm/activity-stamp.service";
@@ -210,7 +216,12 @@ export class GoogleConnectionService {
 		if (!options.purge) return { domain: normalised, purged: 0 };
 
 		const company = await this.db.company.findUnique({
-			where: { domain: normalised },
+			where: {
+				organizationId_domain: {
+					organizationId: currentTenantId(),
+					domain: normalised,
+				},
+			},
 			select: { id: true },
 		});
 
@@ -233,10 +244,7 @@ export class GoogleConnectionService {
 	}
 }
 
-async function rebuildThreads(
-	tx: Prisma.TransactionClient,
-	threadIds: string[],
-): Promise<void> {
+async function rebuildThreads(tx: Tx, threadIds: string[]): Promise<void> {
 	if (threadIds.length === 0) return;
 
 	const remaining = await tx.emailMessage.findMany({

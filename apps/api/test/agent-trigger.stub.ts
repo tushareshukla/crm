@@ -1,9 +1,9 @@
-import { db, type Prisma } from "@crm/db";
+import { db, type Tx } from "@crm/db";
 import type { CrmEventInput } from "../src/agent/agent-trigger.service";
 
 export function withDiscardedCrmEvents<Result>(
 	work: (
-		tx: Prisma.TransactionClient,
+		tx: Tx,
 		emit: (input: CrmEventInput) => Promise<void>,
 	) => Promise<Result>,
 ): Promise<Result> {

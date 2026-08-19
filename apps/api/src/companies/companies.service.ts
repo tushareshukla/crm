@@ -1,4 +1,5 @@
 import {
+	currentTenantId,
 	type Db,
 	type EnrichmentStatus,
 	type Prisma,
@@ -284,7 +285,12 @@ export class CompaniesService {
 
 		if (domain) {
 			const existing = await this.db.company.findUnique({
-				where: { domain },
+				where: {
+					organizationId_domain: {
+						organizationId: currentTenantId(),
+						domain: domain,
+					},
+				},
 				select: { id: true, name: true },
 			});
 			if (existing) {

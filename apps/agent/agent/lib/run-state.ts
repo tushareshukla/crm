@@ -1,4 +1,4 @@
-import type { Prisma } from "@crm/db";
+import type { Tx } from "@crm/db";
 import type { AgentRunStatus } from "@crm/db/enums";
 
 export type LockedAgentRun = {
@@ -12,7 +12,7 @@ export type LockedAgentRun = {
 };
 
 export async function lockAgentRun(
-	tx: Prisma.TransactionClient,
+	tx: Tx,
 	runId: string,
 ): Promise<LockedAgentRun> {
 	const [run] = await tx.$queryRaw<LockedAgentRun[]>`

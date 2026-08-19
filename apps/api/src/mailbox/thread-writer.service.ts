@@ -1,4 +1,5 @@
 import {
+	currentTenantId,
 	ActivityType,
 	type Db,
 	EmailDirection,
@@ -6,6 +7,7 @@ import {
 	type Prisma,
 	Prisma as PrismaNamespace,
 	RecordSource,
+	type Tx,
 } from "@crm/db";
 import { Injectable, Logger } from "@nestjs/common";
 import { ActivityStampService } from "../crm/activity-stamp.service";
@@ -63,7 +65,12 @@ export class ThreadWriterService {
 		context: MatchContext,
 	): Promise<boolean> {
 		const existing = await this.db.emailMessage.findUnique({
-			where: { rfcMessageId: parsed.rfcMessageId },
+			where: {
+				organizationId_rfcMessageId: {
+					organizationId: currentTenantId(),
+					rfcMessageId: parsed.rfcMessageId,
+				},
+			},
 			select: {
 				threadId: true,
 				thread: {
@@ -88,7 +95,12 @@ export class ThreadWriterService {
 					contactId: existing.thread.contactId,
 				}
 			: await this.db.emailThread.findUnique({
-					where: { rootMessageId: parsed.rootId },
+					where: {
+						organizationId_rootMessageId: {
+							organizationId: currentTenantId(),
+							rootMessageId: parsed.rootId,
+						},
+					},
 					select: { id: true, companyId: true, contactId: true },
 				});
 
@@ -125,7 +137,12 @@ export class ThreadWriterService {
 				const record = existing
 					? { id: existing.threadId }
 					: await tx.emailThread.upsert({
-							where: { rootMessageId: parsed.rootId },
+							where: {
+								organizationId_rootMessageId: {
+									organizationId: currentTenantId(),
+									rootMessageId: parsed.rootId,
+								},
+							},
 							create: {
 								rootMessageId: parsed.rootId,
 								subject: parsed.subject,
@@ -253,7 +270,7 @@ export class ThreadWriterService {
 	}
 
 	private async project(
-		tx: Prisma.TransactionClient,
+		tx: Tx,
 		emailThreadId: string,
 		userId: string,
 		summary: {

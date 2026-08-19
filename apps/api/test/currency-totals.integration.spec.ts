@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { DealStage, db, RateSource } from "@crm/db";
 import { normalizeCurrency } from "@crm/db/currency";
-import { SETTINGS_ID, writeReportingCurrency } from "@crm/db/settings";
+import { settingsId, writeReportingCurrency } from "@crm/db/settings";
 import type { AgentTriggerService } from "../src/agent/agent-trigger.service";
 import { ActivityStampService } from "../src/crm/activity-stamp.service";
 import { ConversionService } from "../src/currency/conversion.service";
@@ -70,7 +70,7 @@ async function pipelineCents(): Promise<number> {
 
 beforeAll(async () => {
 	const existing = await db.appSetting.findUnique({
-		where: { id: SETTINGS_ID },
+		where: { id: settingsId() },
 		select: { reportingCurrency: true },
 	});
 	previousReportingCurrency = existing?.reportingCurrency ?? null;

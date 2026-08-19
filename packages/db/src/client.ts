@@ -2,6 +2,7 @@ import "@crm/env/load";
 
 import { PrismaPg } from "@prisma/adapter-pg";
 import { type Prisma, PrismaClient } from "./generated/prisma/client";
+import { tenantScoping } from "./tenant-extension";
 
 const connectionString =
 	process.env.NODE_ENV === "test" ? testDatabase() : liveDatabase();
@@ -117,7 +118,8 @@ const createPrismaClient = () => {
 		sink({ level: "query", message: query, target, durationMs: duration });
 	});
 
-	return client;
+	// Every query on a tenant model is scoped to the current tenant (see tenant.ts).
+	return client.$extends(tenantScoping);
 };
 
 declare global {
@@ -131,3 +133,12 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 export type Db = typeof db;
+
+/** The client handed to `db.$transaction(async (tx) => …)` — the extended client minus lifecycle methods. */
+export type Tx = Omit<
+	Db,
+	"$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
+>;
+
+/** Accepts either the shared client or a transaction client. */
+export type DbLike = Db | Tx;

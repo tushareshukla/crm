@@ -1,4 +1,4 @@
-import type { Db, Prisma } from "@crm/db";
+import type { Db, Prisma, Tx } from "@crm/db";
 import type { AgentDefinitionStatus } from "@crm/db/enums";
 import { schemas } from "@crm/validation";
 import { readAgentManifestSummary } from "@crm/validation/agent-manifest";
@@ -782,7 +782,7 @@ export class AgentDefinitionsService {
 		});
 	}
 
-	private async lockAgent(tx: Prisma.TransactionClient, id: string) {
+	private async lockAgent(tx: Tx, id: string) {
 		const [agent] = await tx.$queryRaw<
 			Array<{
 				id: string;
@@ -889,10 +889,7 @@ function reviseValidation(
 	};
 }
 
-async function nextVersionNumber(
-	tx: Prisma.TransactionClient,
-	agentId: string,
-): Promise<number> {
+async function nextVersionNumber(tx: Tx, agentId: string): Promise<number> {
 	const latest = await tx.agentVersion.findFirst({
 		where: { agentId },
 		orderBy: { number: "desc" },
@@ -903,7 +900,7 @@ async function nextVersionNumber(
 }
 
 async function carryArtifactsForward(
-	tx: Prisma.TransactionClient,
+	tx: Tx,
 	fromVersionId: string,
 	toVersionId: string,
 ): Promise<void> {

@@ -7,7 +7,12 @@ import {
 	type WorkspaceProfileSections,
 } from "./json";
 
-export const WORKSPACE_ID = "workspace";
+import { currentTenantId } from "./tenant";
+
+/** The current organization id (the tenant). WorkspaceProfile.id equals it. */
+export function workspaceId(): string {
+	return currentTenantId();
+}
 
 export const DEFAULT_WORKSPACE_SLUG = "workspace";
 
@@ -91,7 +96,7 @@ export async function readWorkspaceProfile(
 	db: Db,
 ): Promise<WorkspaceProfile | null> {
 	const row = await db.workspaceProfile.findUnique({
-		where: { id: WORKSPACE_ID },
+		where: { id: workspaceId() },
 		select: {
 			website: true,
 			narrative: true,
@@ -141,7 +146,7 @@ export async function readWorkspaceIdentity(
 ): Promise<WorkspaceIdentity | null> {
 	const [workspace, profile] = await Promise.all([
 		db.organization.findUnique({
-			where: { id: WORKSPACE_ID },
+			where: { id: workspaceId() },
 			select: { name: true, website: true },
 		}),
 		readWorkspaceProfile(db),
@@ -176,8 +181,8 @@ export async function writeWorkspaceProfile(
 	};
 
 	const row = await db.workspaceProfile.upsert({
-		where: { id: WORKSPACE_ID },
-		create: { id: WORKSPACE_ID, ...fields },
+		where: { id: workspaceId() },
+		create: { id: workspaceId(), ...fields },
 		update: fields,
 		select: {
 			website: true,

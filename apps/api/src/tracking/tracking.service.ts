@@ -2,13 +2,13 @@ import {
 	appUrl,
 	canManageTracking,
 	isWorkspaceRole,
-	WORKSPACE_ID,
+	workspaceId,
 	type WorkspaceRole,
 } from "@crm/auth";
 import { type Db, DomainScope, Prisma } from "@crm/db";
 import { describeTouch } from "@crm/db/attribution";
 import { safeFetch } from "@crm/db/safe-fetch";
-import { SETTINGS_ID } from "@crm/db/settings";
+import { settingsId } from "@crm/db/settings";
 import {
 	COOKIE_LIFETIMES,
 	gtmContainers,
@@ -127,7 +127,7 @@ export class TrackingService {
 	async settings(userId: string): Promise<TrackingSettings> {
 		const [row, domains, latest, pageViews, submissions] = await Promise.all([
 			this.db.appSetting.findUnique({
-				where: { id: SETTINGS_ID },
+				where: { id: settingsId() },
 				select: {
 					trackingSiteId: true,
 					trackingCrossDomain: true,
@@ -208,8 +208,8 @@ export class TrackingService {
 		}[flag];
 
 		await this.db.appSetting.upsert({
-			where: { id: SETTINGS_ID },
-			create: { id: SETTINGS_ID, [column]: enabled },
+			where: { id: settingsId() },
+			create: { id: settingsId(), [column]: enabled },
 			update: { [column]: enabled },
 		});
 
@@ -224,8 +224,8 @@ export class TrackingService {
 		}
 
 		await this.db.appSetting.upsert({
-			where: { id: SETTINGS_ID },
-			create: { id: SETTINGS_ID, trackingCookieDays: days },
+			where: { id: settingsId() },
+			create: { id: settingsId(), trackingCookieDays: days },
 			update: { trackingCookieDays: days },
 		});
 
@@ -301,7 +301,7 @@ export class TrackingService {
 
 		const domains = await this.db.trackedDomain.count();
 		const row = await this.db.appSetting.findUnique({
-			where: { id: SETTINGS_ID },
+			where: { id: settingsId() },
 			select: { trackingLimitToDomains: true },
 		});
 
@@ -558,7 +558,7 @@ export class TrackingService {
 
 	private async roleOf(userId: string): Promise<WorkspaceRole | null> {
 		const member = await this.db.member.findFirst({
-			where: { organizationId: WORKSPACE_ID, userId },
+			where: { organizationId: workspaceId(), userId },
 			select: { role: true },
 		});
 

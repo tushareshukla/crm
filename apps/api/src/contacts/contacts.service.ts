@@ -6,6 +6,7 @@ import {
 	type Prisma,
 	Prisma as PrismaNamespace,
 	type RecordSource,
+	type Tx,
 } from "@crm/db";
 import {
 	ConflictException,
@@ -517,10 +518,7 @@ export class ContactsService {
 		return runBulk(ids, (id) => this.delete(id));
 	}
 
-	private async allowAgain(
-		tx: Prisma.TransactionClient,
-		email: string | null,
-	): Promise<void> {
+	private async allowAgain(tx: Tx, email: string | null): Promise<void> {
 		if (!email) return;
 		await tx.suppressedContact.deleteMany({
 			where: { email: { equals: email, mode: "insensitive" } },

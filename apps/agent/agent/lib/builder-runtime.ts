@@ -1,12 +1,12 @@
 import { isDeepStrictEqual } from "node:util";
-import { db, type Prisma } from "@crm/db";
+import { db, type Prisma, type Tx } from "@crm/db";
 import {
 	CRM_EVENT_CATALOG,
 	CRM_EVENT_TYPES,
 	type CrmEventType,
 } from "@crm/db/crm-events";
 import { readAgentModel } from "@crm/db/settings";
-import { WORKSPACE_ID } from "@crm/db/workspace";
+import { workspaceId } from "@crm/db/workspace";
 import { AGENT_ACTION_TYPES } from "@crm/validation/agent-manifest";
 import { z } from "zod";
 import { actionDependency } from "./agent-actions";
@@ -426,7 +426,7 @@ export async function saveBuilderDraft(
 }
 
 async function persistArtifactSnapshots(
-	tx: Prisma.TransactionClient,
+	tx: Tx,
 	conversationId: string,
 	versionId: string,
 	files: ReturnType<typeof artifactFiles>,
@@ -634,7 +634,7 @@ async function connectionStatus(userId: string) {
 			select: { id: true },
 		}),
 		db.member.findMany({
-			where: { organizationId: WORKSPACE_ID },
+			where: { organizationId: workspaceId() },
 			orderBy: { user: { name: "asc" } },
 			select: {
 				user: {
@@ -665,7 +665,7 @@ async function connectionStatus(userId: string) {
 		googleAccounts.flatMap((account) => (account.scope ?? "").split(/[,\s]+/)),
 	);
 	const slackPeople = workspaceMembers.flatMap(({ user }) => {
-		const match = user.slackMemberMatch;
+		const match = user.slackMemberMatch[0];
 		return match?.slackUserId && match.slackHandle
 			? [
 					{

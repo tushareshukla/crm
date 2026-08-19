@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { ActivityType, db, type Prisma } from "@crm/db";
+import { ActivityType, db, type Prisma, type Tx } from "@crm/db";
 import type { AgentActionStatus, AgentTriggerType } from "@crm/db/enums";
 import { lockIdempotencyKey } from "@crm/db/idempotency";
 import {
@@ -850,7 +850,7 @@ export async function finishRun(
 }
 
 async function noActionNeededRefusal(
-	tx: Prisma.TransactionClient,
+	tx: Tx,
 	run: LockedAgentRun,
 ): Promise<string | null> {
 	const { triggerType } = await tx.agentRun.findUniqueOrThrow({
@@ -869,7 +869,7 @@ async function noActionNeededRefusal(
 }
 
 async function requiredActionFailure(
-	tx: Prisma.TransactionClient,
+	tx: Tx,
 	run: LockedAgentRun,
 ): Promise<{ code: string; message: string } | null> {
 	const version = await tx.agentVersion.findUniqueOrThrow({
@@ -930,7 +930,7 @@ async function requiredActionFailure(
 }
 
 async function failLockedRun(
-	tx: Prisma.TransactionClient,
+	tx: Tx,
 	run: LockedAgentRun,
 	code: string,
 	message: string,

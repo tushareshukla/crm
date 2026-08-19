@@ -22,15 +22,16 @@
 		"./json": "./src/json.ts",
 		"./safe-fetch": "./src/safe-fetch.ts",
 		"./settings": "./src/settings.ts",
+		"./tenant": "./src/tenant.ts",
 		"./slack-inventory": "./src/slack-inventory.ts",
 		"./tracking": "./src/tracking.ts",
 		"./workspace": "./src/workspace.ts"
 	},
 	"scripts": {
-		"build": "prisma generate",
+		"build": "prisma generate && bun scripts/generate-tenant-map.ts",
 		"check-types": "tsc --noEmit",
 		"db:deploy": "prisma migrate deploy",
-		"db:generate": "prisma generate",
+		"db:generate": "prisma generate && bun scripts/generate-tenant-map.ts",
 		"db:migrate": "bun scripts/require-local-db.ts db:migrate && prisma migrate dev",
 		"db:push": "bun scripts/require-local-db.ts db:push && prisma db push",
 		"db:reset": "bun scripts/require-local-db.ts db:reset && prisma migrate reset",
@@ -40,7 +41,7 @@
 		"test": "bun test",
 		"dev:prepare": "bun scripts/prepare-dev.ts",
 		"lint": "biome check .",
-		"postinstall": "prisma generate",
+		"postinstall": "prisma generate && bun scripts/generate-tenant-map.ts",
 		"clean": "rm -rf .turbo node_modules src/generated"
 	},
 	"dependencies": {

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { DEFAULT_WORKSPACE_NAME, WORKSPACE_ID } from "@crm/auth";
+import { DEFAULT_WORKSPACE_NAME, workspaceId } from "@crm/auth";
 import { db } from "@crm/db";
 import { workspaceSlug } from "@crm/db/workspace";
 import { AgentAccessService } from "../src/agent/agent-access.service";
@@ -47,10 +47,10 @@ async function clean() {
 
 beforeAll(async () => {
 	await db.organization.upsert({
-		where: { id: WORKSPACE_ID },
+		where: { id: workspaceId() },
 		update: {},
 		create: {
-			id: WORKSPACE_ID,
+			id: workspaceId(),
 			name: DEFAULT_WORKSPACE_NAME,
 			slug: workspaceSlug(DEFAULT_WORKSPACE_NAME),
 			createdAt: new Date(),
@@ -66,7 +66,7 @@ beforeAll(async () => {
 	await db.member.create({
 		data: {
 			id: memberId,
-			organizationId: WORKSPACE_ID,
+			organizationId: workspaceId(),
 			userId,
 			role: "member",
 			createdAt: new Date(),

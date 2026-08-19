@@ -1,4 +1,4 @@
-import { type Db, type FieldEntity, Prisma } from "@crm/db";
+import { type Db, type FieldEntity, Prisma, type Tx } from "@crm/db";
 import { PRIORITY } from "@crm/db/agent-tasks";
 import { CRM_EVENT_CATALOG, type CrmEventType } from "@crm/db/crm-events";
 import { lockIdempotencyKey } from "@crm/db/idempotency";
@@ -111,10 +111,7 @@ export class AgentTriggerService {
 	}
 
 	async withTasks<Result>(
-		work: (
-			tx: Prisma.TransactionClient,
-			queue: AgentTaskQueue,
-		) => Promise<Result>,
+		work: (tx: Tx, queue: AgentTaskQueue) => Promise<Result>,
 	): Promise<Result> {
 		let queued = false;
 
@@ -139,7 +136,7 @@ export class AgentTriggerService {
 	private queueSlackChannelJoin(
 		channelId: string,
 		channelName: string,
-		client?: Prisma.TransactionClient,
+		client?: Tx,
 	): Promise<boolean> {
 		return this.enqueue(
 			{
@@ -161,7 +158,7 @@ export class AgentTriggerService {
 
 	async withCrmEvents<Result>(
 		work: (
-			tx: Prisma.TransactionClient,
+			tx: Tx,
 			emit: (input: CrmEventInput) => Promise<void>,
 		) => Promise<Result>,
 	): Promise<Result> {
@@ -374,10 +371,10 @@ export class AgentTriggerService {
 			subject?: { path: string[]; value: string };
 		},
 		required = false,
-		client?: Prisma.TransactionClient,
+		client?: Tx,
 	): Promise<boolean> {
 		try {
-			const write = async (tx: Prisma.TransactionClient) => {
+			const write = async (tx: Tx) => {
 				await lockIdempotencyKey(
 					tx,
 					`agent-task:${task.kind}:${task.contactId ?? ""}:${task.companyId ?? ""}:${task.subject?.value ?? ""}`,
@@ -436,10 +433,7 @@ export class AgentTriggerService {
 		}
 	}
 
-	private async createEventTask(
-		tx: Prisma.TransactionClient,
-		input: CrmEventInput,
-	): Promise<void> {
+	private async createEventTask(tx: Tx, input: CrmEventInput): Promise<void> {
 		const recordIds = {
 			contactId: input.record.kind === "contact" ? input.record.id : null,
 			companyId: input.record.kind === "company" ? input.record.id : null,

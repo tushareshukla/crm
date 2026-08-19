@@ -1,11 +1,11 @@
 import {
 	isWorkspaceAdmin,
 	toWorkspaceRole,
-	WORKSPACE_ID,
+	workspaceId,
 	type WorkspaceRole,
 	workspaceRoleOf,
 } from "@crm/auth";
-import type { Db, Prisma } from "@crm/db";
+import type { Db, Tx } from "@crm/db";
 import {
 	ForbiddenException,
 	Injectable,
@@ -28,15 +28,11 @@ export class AgentAccessService {
 		return role;
 	}
 
-	async assertCanManageInTransaction(
-		tx: Prisma.TransactionClient,
-		agentId: string,
-		userId: string,
-	) {
+	async assertCanManageInTransaction(tx: Tx, agentId: string, userId: string) {
 		const [member] = await tx.$queryRaw<Array<{ role: string }>>`
 			SELECT role
 			FROM "member"
-			WHERE "organizationId" = ${WORKSPACE_ID}
+			WHERE "organizationId" = ${workspaceId()}
 				AND "userId" = ${userId}
 			FOR SHARE
 		`;

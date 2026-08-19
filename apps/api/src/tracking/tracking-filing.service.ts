@@ -1,5 +1,11 @@
 import { workspaceDomains } from "@crm/auth";
-import { ActivityType, type Db, Prisma, RecordSource } from "@crm/db";
+import {
+	currentTenantId,
+	ActivityType,
+	type Db,
+	Prisma,
+	RecordSource,
+} from "@crm/db";
 import type { Touch } from "@crm/db/attribution";
 import {
 	CONTACT_CAP_REASON,
@@ -87,7 +93,12 @@ export class TrackingFilingService {
 		if (suppressed) return this.skip(submission.id, suppressed);
 
 		const existing = await this.db.contact.findUnique({
-			where: { email },
+			where: {
+				organizationId_email: {
+					organizationId: currentTenantId(),
+					email: email,
+				},
+			},
 			select: { id: true },
 		});
 
@@ -157,7 +168,12 @@ export class TrackingFilingService {
 		}
 
 		return this.db.contact.findUnique({
-			where: { email },
+			where: {
+				organizationId_email: {
+					organizationId: currentTenantId(),
+					email: email,
+				},
+			},
 			select: { id: true },
 		});
 	}

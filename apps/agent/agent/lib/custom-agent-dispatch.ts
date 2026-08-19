@@ -1,4 +1,4 @@
-import { db, Prisma } from "@crm/db";
+import { db, Prisma, type Tx } from "@crm/db";
 import { CRM_EVENT_CATALOG } from "@crm/db/crm-events";
 import { lockIdempotencyKey } from "@crm/db/idempotency";
 import { crmEventTask } from "@crm/validation/agent-events";
@@ -725,7 +725,7 @@ export type LockedBuilderConversation = {
 };
 
 export async function lockBuilderConversation(
-	tx: Prisma.TransactionClient,
+	tx: Tx,
 	conversationId: string,
 ): Promise<LockedBuilderConversation | null> {
 	const [conversation] = await tx.$queryRaw<LockedBuilderConversation[]>`

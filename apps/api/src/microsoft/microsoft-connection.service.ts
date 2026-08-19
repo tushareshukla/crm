@@ -1,5 +1,5 @@
 import { isMicrosoftConfigured, signsInWithMicrosoft } from "@crm/auth";
-import { type Db, GoogleSyncStatus, type Prisma } from "@crm/db";
+import { type Db, GoogleSyncStatus, type Prisma, type Tx } from "@crm/db";
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { ActivityStampService } from "../crm/activity-stamp.service";
 import { InjectDatabase } from "../database/database.constants";
@@ -181,10 +181,7 @@ export class MicrosoftConnectionService {
 	}
 }
 
-async function rebuildThreads(
-	tx: Prisma.TransactionClient,
-	threadIds: string[],
-): Promise<void> {
+async function rebuildThreads(tx: Tx, threadIds: string[]): Promise<void> {
 	if (threadIds.length === 0) return;
 
 	const remaining = await tx.emailMessage.findMany({

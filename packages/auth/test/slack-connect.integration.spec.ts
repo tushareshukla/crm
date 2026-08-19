@@ -16,7 +16,7 @@ import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import * as z from "zod";
 import {
 	DEFAULT_WORKSPACE_NAME,
-	WORKSPACE_ID,
+	workspaceId,
 	type WorkspaceRole,
 } from "../src/organization";
 import { GOOGLE_PROVIDER_ID, SLACK_PROVIDER_ID } from "../src/scopes";
@@ -123,7 +123,7 @@ const seat = async (
 		await db.member.create({
 			data: {
 				id: idOf(`${label}-member`),
-				organizationId: WORKSPACE_ID,
+				organizationId: workspaceId(),
 				userId: user.id,
 				role,
 				createdAt: now,
@@ -167,21 +167,21 @@ const arrived = async (response: Response): Promise<boolean> =>
 	arrival.safeParse(await response.json()).success;
 
 const clear = async () => {
-	await db.member.deleteMany({ where: { organizationId: WORKSPACE_ID } });
-	await db.organization.deleteMany({ where: { id: WORKSPACE_ID } });
+	await db.member.deleteMany({ where: { organizationId: workspaceId() } });
+	await db.organization.deleteMany({ where: { id: workspaceId() } });
 	await db.user.deleteMany({ where: { email: { endsWith: EMAIL_SUFFIX } } });
 };
 
 beforeAll(async () => {
 	const organization = await db.organization.findUnique({
-		where: { id: WORKSPACE_ID },
+		where: { id: workspaceId() },
 		select: { name: true, slug: true, website: true, metadata: true },
 	});
 
 	snapshot = {
 		organization,
 		members: await db.member.findMany({
-			where: { organizationId: WORKSPACE_ID },
+			where: { organizationId: workspaceId() },
 			select: { id: true, userId: true, role: true, createdAt: true },
 		}),
 	};
@@ -192,7 +192,7 @@ beforeEach(async () => {
 
 	await db.organization.create({
 		data: {
-			id: WORKSPACE_ID,
+			id: workspaceId(),
 			name: DEFAULT_WORKSPACE_NAME,
 			slug: workspaceSlug(DEFAULT_WORKSPACE_NAME),
 			createdAt: new Date(),
@@ -206,7 +206,7 @@ afterAll(async () => {
 	if (snapshot.organization) {
 		await db.organization.create({
 			data: {
-				id: WORKSPACE_ID,
+				id: workspaceId(),
 				createdAt: new Date(),
 				...snapshot.organization,
 			},
@@ -215,7 +215,7 @@ afterAll(async () => {
 		await db.member.createMany({
 			data: snapshot.members.map((member) => ({
 				...member,
-				organizationId: WORKSPACE_ID,
+				organizationId: workspaceId(),
 			})),
 		});
 	}

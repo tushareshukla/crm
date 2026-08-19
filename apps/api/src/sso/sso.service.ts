@@ -6,7 +6,7 @@ import {
 	ssoCallbackBase,
 	ssoCallbackURL,
 	ssoProviderName,
-	WORKSPACE_ID,
+	workspaceId,
 	workspaceRoleOf,
 } from "@crm/auth";
 import type { Db, Prisma } from "@crm/db";
@@ -141,7 +141,7 @@ export class SsoService {
 
 	async signInOptions(): Promise<SignInOptions> {
 		const rows = await this.db.ssoProvider.findMany({
-			where: { organizationId: WORKSPACE_ID },
+			where: { organizationId: workspaceId() },
 			select: { providerId: true },
 			orderBy: { providerId: "asc" },
 		});
@@ -203,7 +203,7 @@ export class SsoService {
 					providerId: input.providerId,
 					issuer: input.issuer,
 					domain: domains.join(","),
-					organizationId: WORKSPACE_ID,
+					organizationId: workspaceId(),
 					oidcConfig: {
 						clientId: input.clientId,
 						clientSecret: input.clientSecret,
@@ -254,7 +254,7 @@ export class SsoService {
 	private searchWhere(q: string): Prisma.SsoProviderWhereInput {
 		const term = q.trim();
 		const where: Prisma.SsoProviderWhereInput = {
-			organizationId: WORKSPACE_ID,
+			organizationId: workspaceId(),
 		};
 
 		if (term) {

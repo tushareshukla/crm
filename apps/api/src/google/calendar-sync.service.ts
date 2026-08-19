@@ -1,4 +1,5 @@
 import {
+	currentTenantId,
 	ActivityType,
 	type Db,
 	GoogleSyncStatus,
@@ -202,7 +203,8 @@ export class CalendarSyncService {
 		if (!originalStart) return "ignored";
 
 		const key = {
-			iCalUid_originalStartTime: {
+			organizationId_iCalUid_originalStartTime: {
+				organizationId: currentTenantId(),
 				iCalUid,
 				originalStartTime: originalStart.at,
 			},

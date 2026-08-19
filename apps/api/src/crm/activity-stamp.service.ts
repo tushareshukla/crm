@@ -1,4 +1,9 @@
-import { type Db, type Prisma, Prisma as PrismaNamespace } from "@crm/db";
+import {
+	type Db,
+	type Prisma,
+	Prisma as PrismaNamespace,
+	type Tx,
+} from "@crm/db";
 import { Injectable, Logger } from "@nestjs/common";
 import { InjectDatabase } from "../database/database.constants";
 
@@ -88,7 +93,7 @@ export class ActivityStampService {
 
 	async targetsOf(
 		where: Prisma.ActivityWhereInput,
-		client: Prisma.TransactionClient = this.db,
+		client: Tx = this.db,
 	): Promise<StampTargets> {
 		const [companies, contacts, deals] = await Promise.all([
 			client.activity.groupBy({ by: ["companyId"], where }),

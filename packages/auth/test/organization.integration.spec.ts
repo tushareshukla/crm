@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@crm/db";
-import { ensureWorkspaceMembership, WORKSPACE_ID } from "../src/organization";
+import { ensureWorkspaceMembership, workspaceId } from "../src/organization";
 
 const suffix = process.env.TEST_RUN_ID ?? "organization-spec";
 
@@ -26,7 +26,7 @@ const seedUser = async (label: string, createdAt: Date): Promise<string> => {
 
 const roleOf = async (userId: string): Promise<string | null> => {
 	const member = await db.member.findUnique({
-		where: { organizationId_userId: { organizationId: WORKSPACE_ID, userId } },
+		where: { organizationId_userId: { organizationId: workspaceId(), userId } },
 		select: { role: true },
 	});
 
@@ -42,7 +42,7 @@ const clear = async () => {
 	});
 
 	const strangers = await db.member.count({
-		where: { organizationId: WORKSPACE_ID },
+		where: { organizationId: workspaceId() },
 	});
 
 	if (strangers > 0) {
@@ -65,7 +65,7 @@ describe("ensureWorkspaceMembership", () => {
 	it("creates the one workspace and enrols everyone who already had an account", async () => {
 		const workspaceId = await ensureWorkspaceMembership(secondId);
 
-		expect(workspaceId).toBe(WORKSPACE_ID);
+		expect(workspaceId).toBe(workspaceId());
 		expect(await roleOf(firstId)).toBe("owner");
 		expect(await roleOf(secondId)).toBe("member");
 	});
@@ -76,7 +76,7 @@ describe("ensureWorkspaceMembership", () => {
 		await db.member.update({
 			where: {
 				organizationId_userId: {
-					organizationId: WORKSPACE_ID,
+					organizationId: workspaceId(),
 					userId: secondId,
 				},
 			},
@@ -87,7 +87,7 @@ describe("ensureWorkspaceMembership", () => {
 		await ensureWorkspaceMembership(secondId);
 
 		const rows = await db.member.findMany({
-			where: { organizationId: WORKSPACE_ID, userId: secondId },
+			where: { organizationId: workspaceId(), userId: secondId },
 		});
 
 		expect(rows).toHaveLength(1);
@@ -114,7 +114,7 @@ describe("ensureWorkspaceMembership", () => {
 		expect(await roleOf(firstId)).toBe("owner");
 
 		const owners = await db.member.count({
-			where: { organizationId: WORKSPACE_ID, role: "owner" },
+			where: { organizationId: workspaceId(), role: "owner" },
 		});
 
 		expect(owners).toBe(1);

@@ -1,5 +1,7 @@
 import { mirror } from "../src/blob";
 import { db } from "../src/client";
+import { currentTenantId, runWithTenant, withoutTenant } from "../src/tenant";
+import { workspaceSlug } from "../src/workspace";
 import { DEFAULT_REPORTING_CURRENCY } from "../src/currency";
 import { resolveFavicon } from "../src/favicon";
 import {
@@ -7,7 +9,7 @@ import {
 	DealStage,
 	RateSource,
 } from "../src/generated/prisma/enums";
-import { readReportingCurrency, SETTINGS_ID } from "../src/settings";
+import { readReportingCurrency, settingsId } from "../src/settings";
 
 function makeRandom(seed: number): () => number {
 	let a = seed;
@@ -373,7 +375,12 @@ async function seedCompanies(
 
 	for (const company of COMPANIES) {
 		const row = await db.company.upsert({
-			where: { domain: company.domain },
+			where: {
+				organizationId_domain: {
+					organizationId: currentTenantId(),
+					domain: company.domain,
+				},
+			},
 			create: {
 				name: company.name,
 				domain: company.domain,
@@ -440,7 +447,9 @@ async function seedContacts(
 			used.add(email);
 
 			const contact = await db.contact.upsert({
-				where: { email },
+				where: {
+					organizationId_email: { organizationId: currentTenantId(), email },
+				},
 				create: {
 					firstName,
 					lastName,
@@ -496,9 +505,9 @@ async function seedRates(): Promise<number> {
 	const asOf = daysFromNow(-1);
 
 	await db.appSetting.upsert({
-		where: { id: SETTINGS_ID },
+		where: { id: settingsId() },
 		create: {
-			id: SETTINGS_ID,
+			id: settingsId(),
 			reportingCurrency: DEFAULT_REPORTING_CURRENCY,
 		},
 		update: {},
@@ -766,7 +775,52 @@ async function seedActivities(
 	return rows.length;
 }
 
+/**
+ * The demo pipeline lives in one organization. SEED_ORG_SLUG picks it (default
+ * "demo"); the org is created if missing and every existing user is enrolled
+ * so somebody can open it.
+ */
+async function seedOrganization(): Promise<string> {
+	const slug = workspaceSlug(process.env.SEED_ORG_SLUG ?? "demo");
+	return withoutTenant(async () => {
+		const org = await db.organization.upsert({
+			where: { slug },
+			create: {
+				id: `org-${slug}`,
+				name: slug === "demo" ? "Demo" : slug,
+				slug,
+				createdAt: new Date(),
+			},
+			update: {},
+			select: { id: true },
+		});
+		const users = await db.user.findMany({
+			select: { id: true },
+			orderBy: [{ createdAt: "asc" }],
+		});
+		if (users.length > 0) {
+			await db.member.createMany({
+				data: users.map((user, index) => ({
+					id: crypto.randomUUID(),
+					organizationId: org.id,
+					userId: user.id,
+					role: index === 0 ? "owner" : "member",
+					createdAt: new Date(),
+				})),
+				skipDuplicates: true,
+			});
+		}
+		console.log(`Seeding into organization "${slug}" (${org.id}).`);
+		return org.id;
+	});
+}
+
 async function main() {
+	const organizationId = await seedOrganization();
+	await runWithTenant(organizationId, seedTenant);
+}
+
+async function seedTenant() {
 	const rates = await seedRates();
 	const ownerIds = await seedOwners();
 	const companies = await seedCompanies(ownerIds);

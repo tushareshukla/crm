@@ -1,7 +1,7 @@
 import {
 	canManageConnections,
 	isSlackConfigured,
-	WORKSPACE_ID,
+	workspaceId,
 } from "@crm/auth";
 import type { Db, Prisma } from "@crm/db";
 import { schemas } from "@crm/validation";
@@ -60,11 +60,11 @@ export class SlackConnectionService {
 			}),
 			this.db.slackMemberMatch.findMany({
 				where: {
-					crmUser: { members: { some: { organizationId: WORKSPACE_ID } } },
+					crmUser: { members: { some: { organizationId: workspaceId() } } },
 				},
 				select: { slackUserId: true, updatedAt: true },
 			}),
-			this.db.member.count({ where: { organizationId: WORKSPACE_ID } }),
+			this.db.member.count({ where: { organizationId: workspaceId() } }),
 			this.db.slackWorkspaceGrant.findFirst({
 				select: { id: true, teamName: true },
 			}),
@@ -102,7 +102,7 @@ export class SlackConnectionService {
 		await this.access.assertMember(userId);
 		const [members, syncing] = await Promise.all([
 			this.db.member.findMany({
-				where: { organizationId: WORKSPACE_ID },
+				where: { organizationId: workspaceId() },
 				orderBy: { user: { name: "asc" } },
 				select: {
 					user: {

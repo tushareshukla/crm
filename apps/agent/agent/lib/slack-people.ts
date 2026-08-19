@@ -1,6 +1,6 @@
-import { db } from "@crm/db";
+import { currentTenantId, db } from "@crm/db";
 import { queueSlackInventorySync } from "@crm/db/slack-inventory";
-import { WORKSPACE_ID } from "@crm/db/workspace";
+import { workspaceId } from "@crm/db/workspace";
 import { parse, schemas } from "@crm/validation";
 import { z } from "zod";
 import { SLACK } from "./slack-config";
@@ -88,7 +88,7 @@ export async function runSlackPeopleMatch(): Promise<string> {
 		}),
 	);
 	const crmMembers = await db.member.findMany({
-		where: { organizationId: WORKSPACE_ID },
+		where: { organizationId: workspaceId() },
 		select: {
 			user: {
 				select: {
@@ -104,7 +104,12 @@ export async function runSlackPeopleMatch(): Promise<string> {
 		const slack = byEmail.get(user.email.trim().toLowerCase());
 		const slackHandle = slack ? `@${slack.name ?? slack.id}` : null;
 		await db.slackMemberMatch.upsert({
-			where: { crmUserId: user.id },
+			where: {
+				organizationId_crmUserId: {
+					organizationId: currentTenantId(),
+					crmUserId: user.id,
+				},
+			},
 			create: {
 				crmUserId: user.id,
 				slackUserId: slack?.id,

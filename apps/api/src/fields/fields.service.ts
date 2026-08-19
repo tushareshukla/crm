@@ -1,8 +1,10 @@
 import {
+	currentTenantId,
 	type Db,
 	type FieldEntity,
 	type Prisma,
 	Prisma as PrismaNamespace,
+	type Tx,
 } from "@crm/db";
 import {
 	attachValues,
@@ -58,7 +60,13 @@ export class FieldsService {
 
 	async byKey(entity: FieldEntity, key: string): Promise<SerializedField> {
 		const definition = await this.db.fieldDefinition.findUnique({
-			where: { entity_key: { entity, key } },
+			where: {
+				organizationId_entity_key: {
+					organizationId: currentTenantId(),
+					entity,
+					key,
+				},
+			},
 			include: WITH_OPTIONS,
 		});
 
@@ -75,7 +83,13 @@ export class FieldsService {
 		}
 
 		const taken = await this.db.fieldDefinition.findUnique({
-			where: { entity_key: { entity: input.entity, key } },
+			where: {
+				organizationId_entity_key: {
+					organizationId: currentTenantId(),
+					entity: input.entity,
+					key,
+				},
+			},
 			select: { id: true },
 		});
 
@@ -332,7 +346,7 @@ export class FieldsService {
 
 	async definitionsFor(
 		entity: FieldEntity,
-		client: Prisma.TransactionClient = this.db,
+		client: Tx = this.db,
 	): Promise<FieldDefinitionWithOptions[]> {
 		return client.fieldDefinition.findMany({
 			where: { entity, archivedAt: null },
@@ -401,7 +415,7 @@ export class FieldsService {
 	}
 
 	async applyValues(
-		tx: Prisma.TransactionClient,
+		tx: Tx,
 		entity: FieldEntity,
 		recordId: string,
 		values: Record<string, unknown>,

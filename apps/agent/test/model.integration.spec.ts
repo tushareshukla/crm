@@ -11,13 +11,13 @@ import { db, type Prisma } from "@crm/db";
 import {
 	DEFAULT_AGENT_MODEL,
 	readAgentModel,
-	SETTINGS_ID,
+	settingsId,
 	writeAgentModel,
 } from "@crm/db/settings";
 import { selectedModel } from "../agent/lib/model";
 
 async function clear() {
-	await db.appSetting.deleteMany({ where: { id: SETTINGS_ID } });
+	await db.appSetting.deleteMany({ where: { id: settingsId() } });
 }
 
 /**
@@ -28,7 +28,7 @@ async function clear() {
 let saved: Prisma.AppSettingUncheckedCreateInput | null = null;
 
 beforeAll(async () => {
-	saved = await db.appSetting.findUnique({ where: { id: SETTINGS_ID } });
+	saved = await db.appSetting.findUnique({ where: { id: settingsId() } });
 });
 
 beforeEach(clear);

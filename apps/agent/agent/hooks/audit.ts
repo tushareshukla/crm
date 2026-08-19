@@ -1,4 +1,4 @@
-import { db, Prisma } from "@crm/db";
+import { db, Prisma, type Tx } from "@crm/db";
 import { defineHook } from "eve/hooks";
 import { z } from "zod";
 import { isTransportOnlyEvent } from "../lib/event-persistence";
@@ -73,7 +73,7 @@ export default defineHook({
 });
 
 async function persistBuilderLifecycle(
-	tx: Prisma.TransactionClient,
+	tx: Tx,
 	event: { type: string },
 	sessionId: string,
 	ctx: Parameters<typeof purposeOf>[0],
@@ -104,7 +104,7 @@ async function persistBuilderLifecycle(
 }
 
 async function persistRunEvent(
-	tx: Prisma.TransactionClient,
+	tx: Tx,
 	eventId: string,
 	type: string,
 	data: Prisma.InputJsonObject,

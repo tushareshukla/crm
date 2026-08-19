@@ -17,7 +17,7 @@ export {
 	isWorkspaceAdmin,
 	isWorkspaceRole,
 	toWorkspaceRole,
-	WORKSPACE_ID,
+	workspaceId,
 	WORKSPACE_ROLES,
 	type WorkspaceRole,
 	workspaceRoleOf,

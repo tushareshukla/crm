@@ -1,5 +1,5 @@
 import { workspaceDomains } from "@crm/auth/workspace";
-import { type Db, RecordSource } from "@crm/db";
+import { currentTenantId, type Db, RecordSource } from "@crm/db";
 import { lockIdempotencyKey } from "@crm/db/idempotency";
 import { Injectable, Logger } from "@nestjs/common";
 import { AgentTriggerService } from "../agent/agent-trigger.service";
@@ -217,7 +217,12 @@ export class MailboxMatchService {
 		const outcome = await this.agent.withCrmEvents(async (tx, emit) => {
 			await lockIdempotencyKey(tx, `mailbox-contact:${person.email}`);
 			const existing = await tx.contact.findUnique({
-				where: { email: person.email },
+				where: {
+					organizationId_email: {
+						organizationId: currentTenantId(),
+						email: person.email,
+					},
+				},
 				select: {
 					id: true,
 					firstName: true,

@@ -40,32 +40,41 @@ model User {
   conversationShares      AgentConversationShare[]      @relation("ConversationShareCreator")
   conversationSubmissions AgentConversationSubmission[] @relation("ConversationSubmissionAuthor")
   conversationFeedback    AgentConversationFeedback[]   @relation("ConversationFeedbackAuthor")
-  slackMemberMatch        SlackMemberMatch?
+  slackMemberMatch        SlackMemberMatch[]
 
   members     Member[]
   invitations Invitation[]
 
   ssoproviders SsoProvider[]
+  auditEvents  AuditEvent[]  @relation("AuditActor")
 
   @@unique([email])
   @@map("user")
 }
 
 model SlackMemberMatch {
-  id                  String   @id @default(cuid())
-  crmUserId           String   @unique
-  crmUser             User     @relation(fields: [crmUserId], references: [id], onDelete: Cascade)
-  slackUserId         String?
-  slackHandle         String?
-  slackEmail          String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  organizationId String       @default("")
+  organization   Organization @relation("OrgSlackMemberMatch", fields: [organizationId], references: [id], onDelete: Cascade)
 
+  id          String   @id @default(cuid())
+  crmUserId   String
+  crmUser     User     @relation(fields: [crmUserId], references: [id], onDelete: Cascade)
+  slackUserId String?
+  slackHandle String?
+  slackEmail  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([organizationId, crmUserId])
   @@index([slackUserId])
+  @@index([organizationId])
   @@map("slackMemberMatch")
 }
 
 model SlackChannel {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgSlackChannel", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id                String    @id
   name              String
   memberCount       Int?
@@ -79,29 +88,41 @@ model SlackChannel {
 
   @@index([available, name])
   @@index([updatedAt])
+  @@index([organizationId])
   @@map("slackChannel")
 }
 
 model SlackInstallation {
-  installerId String   @id
+  organizationId String       @default("")
+  organization   Organization @relation("OrgSlackInstallation", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  id          String   @id @default(cuid())
+  installerId String
   teamId      String
   teamName    String?
   userToken   String?
   userScopes  String
   createdAt   DateTime @default(now())
 
+  @@unique([organizationId, installerId])
+  @@index([organizationId])
   @@map("slackInstallation")
 }
 
 model SlackWorkspaceGrant {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgSlackWorkspaceGrant", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id         String   @id @default(cuid())
-  teamId     String   @unique
+  teamId     String
   teamName   String?
   userToken  String
   userScopes String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  @@unique([organizationId, teamId])
+  @@index([organizationId])
   @@map("slackWorkspaceGrant")
 }
 
@@ -275,9 +296,12 @@ enum AgentResponseRating {
 }
 
 model Company {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgCompany", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id          String  @id @default(cuid())
   name        String
-  domain      String? @unique
+  domain      String?
   website     String?
   description String?
 
@@ -327,27 +351,36 @@ model Company {
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
+  @@unique([organizationId, domain])
   @@index([ownerId])
   @@index([name])
   @@index([lastActivityAt])
+  @@index([organizationId])
   @@map("company")
 }
 
 model CompanyEnrichment {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgCompanyEnrichment", fields: [organizationId], references: [id], onDelete: Cascade)
+
   companyId String   @id
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   source    String   @default("context.dev")
   raw       Json
   fetchedAt DateTime @default(now())
 
+  @@index([organizationId])
   @@map("companyEnrichment")
 }
 
 model Contact {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgContact", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id          String  @id @default(cuid())
   firstName   String
   lastName    String?
-  email       String? @unique
+  email       String?
   phone       String?
   title       String?
   linkedinUrl String?
@@ -386,9 +419,11 @@ model Contact {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
+  @@unique([organizationId, email])
   @@index([companyId])
   @@index([ownerId])
   @@index([lastActivityAt])
+  @@index([organizationId])
   @@map("contact")
 }
 
@@ -406,6 +441,9 @@ enum FactStatus {
 }
 
 model ContactFact {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgContactFact", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id        String  @id @default(cuid())
   contactId String
   contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
@@ -433,10 +471,14 @@ model ContactFact {
 
   @@index([contactId, field, status])
   @@index([status, observedAt])
+  @@index([organizationId])
   @@map("contactFact")
 }
 
 model ContactBrief {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgContactBrief", fields: [organizationId], references: [id], onDelete: Cascade)
+
   contactId String  @id
   contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
@@ -449,10 +491,14 @@ model ContactBrief {
 
   refreshedAt DateTime @default(now())
 
+  @@index([organizationId])
   @@map("contactBrief")
 }
 
 model AgentTask {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgAgentTask", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id        String  @id @default(cuid())
   contactId String?
   companyId String?
@@ -482,10 +528,14 @@ model AgentTask {
   @@index([contactId])
   @@index([dealId])
   @@index([kind, subject], where: { finishedAt: null })
+  @@index([organizationId])
   @@map("agentTask")
 }
 
 model AgentEvent {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgAgentEvent", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id             String             @id
   sessionId      String
   contactId      String?
@@ -499,10 +549,14 @@ model AgentEvent {
   @@index([sessionId, emittedAt])
   @@index([contactId, emittedAt])
   @@index([conversationId, emittedAt])
+  @@index([organizationId])
   @@map("agentEvent")
 }
 
 model AgentConversation {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgAgentConversation", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id String @id @default(cuid())
 
   kind AgentConversationKind @default(RECORD)
@@ -546,10 +600,14 @@ model AgentConversation {
   @@index([dealId, lastMessageAt])
   @@index([userId, kind, lastMessageAt])
   @@index([agentId, lastMessageAt])
+  @@index([organizationId])
   @@map("agentConversation")
 }
 
 model AgentConversationFeedback {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgAgentConversationFeedback", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id String @id @default(cuid())
 
   conversationId String
@@ -566,10 +624,14 @@ model AgentConversationFeedback {
 
   @@unique([conversationId, userId, messageId])
   @@index([conversationId, createdAt])
+  @@index([organizationId])
   @@map("agentConversationFeedback")
 }
 
 model AgentConversationShare {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgAgentConversationShare", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id String @id @default(cuid())
 
   conversationId String
@@ -587,10 +649,14 @@ model AgentConversationShare {
 
   @@unique([conversationId], map: "agentConversationShare_one_active_per_conversation", where: { revokedAt: null })
   @@index([conversationId, revokedAt])
+  @@index([organizationId])
   @@map("agentConversationShare")
 }
 
 model AgentConversationSubmission {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgAgentConversationSubmission", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id String @id @default(cuid())
 
   conversationId String
@@ -618,10 +684,14 @@ model AgentConversationSubmission {
   @@unique([conversationId, inputRequestId])
   @@index([conversationId, createdAt])
   @@index([status, createdAt])
+  @@index([organizationId])
   @@map("agentConversationSubmission")
 }
 
 model AgentConversationAttachment {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgAgentConversationAttachment", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id String @id @default(cuid())
 
   submissionId String
@@ -636,10 +706,14 @@ model AgentConversationAttachment {
   createdAt DateTime @default(now())
 
   @@index([submissionId, position])
+  @@index([organizationId])
   @@map("agentConversationAttachment")
 }
 
 model AgentDefinition {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgAgentDefinition", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id String @id @default(cuid())
 
   name        String
@@ -667,10 +741,14 @@ model AgentDefinition {
   @@unique([currentVersionId, id])
   @@index([status, updatedAt])
   @@index([createdById, createdAt])
+  @@index([organizationId])
   @@map("agentDefinition")
 }
 
 model AgentVersion {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgAgentVersion", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id String @id @default(cuid())
 
   agentId String
@@ -707,10 +785,14 @@ model AgentVersion {
   @@unique([id, agentId])
   @@index([agentId, createdAt])
   @@index([status, createdAt])
+  @@index([organizationId])
   @@map("agentVersion")
 }
 
 model AgentBuilderArtifact {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgAgentBuilderArtifact", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id String @id @default(cuid())
 
   conversationId String?
@@ -731,10 +813,14 @@ model AgentBuilderArtifact {
   @@unique([versionId, path, revision], map: "agentBuilderArtifact_version_path_revision_key", where: { versionId: { not: null } })
   @@index([conversationId, createdAt])
   @@index([versionId, path])
+  @@index([organizationId])
   @@map("agentBuilderArtifact")
 }
 
 model AgentTrigger {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgAgentTrigger", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id String @id @default(cuid())
 
   agentId String
@@ -762,10 +848,14 @@ model AgentTrigger {
   @@index([agentId, enabled])
   @@index([enabled, nextRunAt])
   @@index([versionId])
+  @@index([organizationId])
   @@map("agentTrigger")
 }
 
 model AgentRun {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgAgentRun", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id String @id @default(cuid())
 
   agentId String
@@ -816,10 +906,14 @@ model AgentRun {
   @@index([versionId, createdAt])
   @@index([status, createdAt])
   @@index([triggerId, createdAt])
+  @@index([organizationId])
   @@map("agentRun")
 }
 
 model AgentRunEvent {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgAgentRunEvent", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id String @id @default(cuid())
 
   runId String
@@ -832,10 +926,14 @@ model AgentRunEvent {
 
   @@unique([runId, sequence])
   @@index([runId, emittedAt])
+  @@index([organizationId])
   @@map("agentRunEvent")
 }
 
 model AgentAction {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgAgentAction", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id String @id @default(cuid())
 
   agentId String
@@ -870,10 +968,14 @@ model AgentAction {
   @@index([runId, plannedAt])
   @@index([provider, externalId])
   @@index([status, plannedAt])
+  @@index([organizationId])
   @@map("agentAction")
 }
 
 model AgentAuditEvent {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgAgentAuditEvent", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id String @id @default(cuid())
 
   agentId String
@@ -899,10 +1001,14 @@ model AgentAuditEvent {
   @@index([versionId, emittedAt])
   @@index([actorUserId, emittedAt])
   @@index([type, emittedAt])
+  @@index([organizationId])
   @@map("agentAuditEvent")
 }
 
 model Deal {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgDeal", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id            String              @id @default(cuid())
   conversations AgentConversation[]
   name          String
@@ -940,6 +1046,7 @@ model Deal {
   @@index([lastActivityAt])
   @@index([baseAmount])
   @@index([currency])
+  @@index([organizationId])
   @@map("deal")
 }
 
@@ -965,6 +1072,9 @@ model ExchangeRate {
 }
 
 model DealContact {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgDealContact", fields: [organizationId], references: [id], onDelete: Cascade)
+
   dealId    String
   deal      Deal    @relation(fields: [dealId], references: [id], onDelete: Cascade)
   contactId String
@@ -973,6 +1083,7 @@ model DealContact {
 
   @@id([dealId, contactId])
   @@index([contactId])
+  @@index([organizationId])
   @@map("dealContact")
 }
 
@@ -996,6 +1107,9 @@ enum FieldType {
 }
 
 model FieldDefinition {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgFieldDefinition", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id     String      @id @default(cuid())
   entity FieldEntity
   key    String
@@ -1018,12 +1132,16 @@ model FieldDefinition {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([entity, key])
+  @@unique([organizationId, entity, key])
   @@index([entity, position])
+  @@index([organizationId])
   @@map("fieldDefinition")
 }
 
 model FieldOption {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgFieldOption", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id       String          @id @default(cuid())
   fieldId  String
   field    FieldDefinition @relation(fields: [fieldId], references: [id], onDelete: Cascade)
@@ -1034,10 +1152,14 @@ model FieldOption {
   values     FieldValue[]
 
   @@index([fieldId, position])
+  @@index([organizationId])
   @@map("fieldOption")
 }
 
 model FieldValue {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgFieldValue", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id      String          @id @default(cuid())
   fieldId String
   field   FieldDefinition @relation(fields: [fieldId], references: [id], onDelete: Cascade)
@@ -1071,10 +1193,14 @@ model FieldValue {
   @@index([dealId])
   @@index([optionId])
   @@index([userId])
+  @@index([organizationId])
   @@map("fieldValue")
 }
 
 model Activity {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgActivity", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id      String       @id @default(cuid())
   type    ActivityType
   subject String?
@@ -1108,6 +1234,7 @@ model Activity {
   @@index([contactId, createdAt])
   @@index([dueAt])
   @@index([createdById])
+  @@index([organizationId])
   @@map("activity")
 }
 
@@ -1124,6 +1251,9 @@ enum EmailDirection {
 }
 
 model MailboxSync {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgMailboxSync", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id     String @id @default(cuid())
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1139,14 +1269,18 @@ model MailboxSync {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([userId, source])
+  @@unique([organizationId, userId, source])
   @@index([status])
+  @@index([organizationId])
   @@map("mailboxSync")
 }
 
 model EmailThread {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgEmailThread", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id            String  @id @default(cuid())
-  rootMessageId String  @unique
+  rootMessageId String
   subject       String?
 
   companyId String?
@@ -1164,17 +1298,22 @@ model EmailThread {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([organizationId, rootMessageId])
   @@index([companyId, lastMessageAt])
   @@index([contactId, lastMessageAt])
+  @@index([organizationId])
   @@map("emailThread")
 }
 
 model EmailMessage {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgEmailMessage", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id       String      @id @default(cuid())
   threadId String
   thread   EmailThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
 
-  rfcMessageId     String  @unique
+  rfcMessageId     String
   syncedByUserId   String?
   gmailMessageId   String?
   outlookMessageId String?
@@ -1191,11 +1330,16 @@ model EmailMessage {
 
   createdAt DateTime @default(now())
 
+  @@unique([organizationId, rfcMessageId])
   @@index([threadId, sentAt])
+  @@index([organizationId])
   @@map("emailMessage")
 }
 
 model CalendarEvent {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgCalendarEvent", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id                String   @id @default(cuid())
   iCalUid           String
   originalStartTime DateTime
@@ -1225,13 +1369,17 @@ model CalendarEvent {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([iCalUid, originalStartTime])
+  @@unique([organizationId, iCalUid, originalStartTime])
   @@index([companyId, startsAt])
   @@index([contactId, startsAt])
+  @@index([organizationId])
   @@map("calendarEvent")
 }
 
 model CalendarAttendee {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgCalendarAttendee", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id      String        @id @default(cuid())
   eventId String
   event   CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -1245,26 +1393,38 @@ model CalendarAttendee {
 
   @@unique([eventId, email])
   @@index([contactId])
+  @@index([organizationId])
   @@map("calendarAttendee")
 }
 
 model SuppressedDomain {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgSuppressedDomain", fields: [organizationId], references: [id], onDelete: Cascade)
+
   domain    String   @id
   reason    String?
   createdAt DateTime @default(now())
 
+  @@index([organizationId])
   @@map("suppressedDomain")
 }
 
 model SuppressedContact {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgSuppressedContact", fields: [organizationId], references: [id], onDelete: Cascade)
+
   email     String   @id
   reason    String?
   createdAt DateTime @default(now())
 
+  @@index([organizationId])
   @@map("suppressedContact")
 }
 
 model AppSetting {
+  organizationId String       @unique @default("")
+  organization   Organization @relation("OrgAppSetting", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id String @id
 
   agentModelId String?
@@ -1277,15 +1437,15 @@ model AppSetting {
 
   ratesRefreshedAt DateTime?
 
-  trackingSiteId           String?  @unique
-  trackingCrossDomain      Boolean  @default(true)
-  trackingLimitToDomains   Boolean  @default(true)
-  trackingCookieSubdomains Boolean  @default(false)
-  trackingSecureCookies    Boolean  @default(true)
-  trackingHonourDnt        Boolean  @default(true)
-  trackingCookieDays       Int      @default(395)
+  trackingSiteId           String? @unique
+  trackingCrossDomain      Boolean @default(true)
+  trackingLimitToDomains   Boolean @default(true)
+  trackingCookieSubdomains Boolean @default(false)
+  trackingSecureCookies    Boolean @default(true)
+  trackingHonourDnt        Boolean @default(true)
+  trackingCookieDays       Int     @default(395)
   trackingConfigHash       String?
-  trackingPaused           Boolean  @default(false)
+  trackingPaused           Boolean @default(false)
 
   updatedAt DateTime @updatedAt
 
@@ -1298,8 +1458,11 @@ enum DomainScope {
 }
 
 model TrackedDomain {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgTrackedDomain", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id    String      @id @default(cuid())
-  host  String      @unique
+  host  String
   scope DomainScope @default(EXACT_HOST)
 
   pageViews  Int       @default(0)
@@ -1307,23 +1470,28 @@ model TrackedDomain {
 
   createdAt DateTime @default(now())
 
+  @@unique([organizationId, host])
+  @@index([organizationId])
   @@map("trackedDomain")
 }
 
 model TrackedVisitor {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgTrackedVisitor", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id String @id
 
   contactId String?
   contact   Contact? @relation("VisitorContact", fields: [contactId], references: [id], onDelete: SetNull)
 
-  firstSource     String?
-  firstMedium     String?
-  firstCampaign   String?
-  firstTerm       String?
-  firstContent    String?
-  firstReferrer   String?
-  firstLanding    String?
-  firstTouchAt    DateTime?
+  firstSource   String?
+  firstMedium   String?
+  firstCampaign String?
+  firstTerm     String?
+  firstContent  String?
+  firstReferrer String?
+  firstLanding  String?
+  firstTouchAt  DateTime?
 
   lastSource   String?
   lastMedium   String?
@@ -1339,10 +1507,14 @@ model TrackedVisitor {
 
   @@index([contactId])
   @@index([firstSource])
+  @@index([organizationId])
   @@map("trackedVisitor")
 }
 
 model TrackedEvent {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgTrackedEvent", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id String @id @default(cuid())
 
   visitorId String
@@ -1362,19 +1534,27 @@ model TrackedEvent {
   @@index([occurredAt])
   @@index([host, occurredAt])
   @@index([source, occurredAt])
+  @@index([organizationId])
   @@map("trackedEvent")
 }
 
 model TrackingCounter {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgTrackingCounter", fields: [organizationId], references: [id], onDelete: Cascade)
+
   key       String   @id
   value     Int      @default(0)
   expiresAt DateTime
 
   @@index([expiresAt])
+  @@index([organizationId])
   @@map("trackingCounter")
 }
 
 model TrackedPageDaily {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgTrackedPageDaily", fields: [organizationId], references: [id], onDelete: Cascade)
+
   day      DateTime
   host     String
   path     String
@@ -1383,10 +1563,14 @@ model TrackedPageDaily {
 
   @@id([day, host, path])
   @@index([host, day])
+  @@index([organizationId])
   @@map("trackedPageDaily")
 }
 
 model FormSubmission {
+  organizationId String       @default("")
+  organization   Organization @relation("OrgFormSubmission", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id String @id @default(cuid())
 
   visitorId String?
@@ -1410,6 +1594,7 @@ model FormSubmission {
 
   @@index([contactId])
   @@index([createdAt])
+  @@index([organizationId])
   @@map("formSubmission")
 }
 
@@ -1453,11 +1638,67 @@ model Organization {
   members     Member[]
   invitations Invitation[]
 
+  status      OrgStatus @default(ACTIVE)
+  suspendedAt DateTime?
+  limits      Json?
+  settings    Json?
+  updatedAt   DateTime  @default(now()) @updatedAt
+
+  companies                    Company[]                     @relation("OrgCompany")
+  companyEnrichments           CompanyEnrichment[]           @relation("OrgCompanyEnrichment")
+  contacts                     Contact[]                     @relation("OrgContact")
+  contactFacts                 ContactFact[]                 @relation("OrgContactFact")
+  contactBriefs                ContactBrief[]                @relation("OrgContactBrief")
+  agentTasks                   AgentTask[]                   @relation("OrgAgentTask")
+  agentEvents                  AgentEvent[]                  @relation("OrgAgentEvent")
+  agentConversations           AgentConversation[]           @relation("OrgAgentConversation")
+  agentConversationFeedbacks   AgentConversationFeedback[]   @relation("OrgAgentConversationFeedback")
+  agentConversationShares      AgentConversationShare[]      @relation("OrgAgentConversationShare")
+  agentConversationSubmissions AgentConversationSubmission[] @relation("OrgAgentConversationSubmission")
+  agentConversationAttachments AgentConversationAttachment[] @relation("OrgAgentConversationAttachment")
+  agentDefinitions             AgentDefinition[]             @relation("OrgAgentDefinition")
+  agentVersions                AgentVersion[]                @relation("OrgAgentVersion")
+  agentBuilderArtifacts        AgentBuilderArtifact[]        @relation("OrgAgentBuilderArtifact")
+  agentTriggers                AgentTrigger[]                @relation("OrgAgentTrigger")
+  agentRuns                    AgentRun[]                    @relation("OrgAgentRun")
+  agentRunEvents               AgentRunEvent[]               @relation("OrgAgentRunEvent")
+  agentActions                 AgentAction[]                 @relation("OrgAgentAction")
+  agentAuditEvents             AgentAuditEvent[]             @relation("OrgAgentAuditEvent")
+  deals                        Deal[]                        @relation("OrgDeal")
+  dealContacts                 DealContact[]                 @relation("OrgDealContact")
+  fieldDefinitions             FieldDefinition[]             @relation("OrgFieldDefinition")
+  fieldOptions                 FieldOption[]                 @relation("OrgFieldOption")
+  fieldValues                  FieldValue[]                  @relation("OrgFieldValue")
+  activities                   Activity[]                    @relation("OrgActivity")
+  mailboxSyncs                 MailboxSync[]                 @relation("OrgMailboxSync")
+  emailThreads                 EmailThread[]                 @relation("OrgEmailThread")
+  emailMessages                EmailMessage[]                @relation("OrgEmailMessage")
+  calendarEvents               CalendarEvent[]               @relation("OrgCalendarEvent")
+  calendarAttendees            CalendarAttendee[]            @relation("OrgCalendarAttendee")
+  suppressedDomains            SuppressedDomain[]            @relation("OrgSuppressedDomain")
+  suppressedContacts           SuppressedContact[]           @relation("OrgSuppressedContact")
+  appSettings                  AppSetting[]                  @relation("OrgAppSetting")
+  workspaceProfiles            WorkspaceProfile[]            @relation("OrgWorkspaceProfile")
+  trackedDomains               TrackedDomain[]               @relation("OrgTrackedDomain")
+  trackedVisitors              TrackedVisitor[]              @relation("OrgTrackedVisitor")
+  trackedEvents                TrackedEvent[]                @relation("OrgTrackedEvent")
+  trackingCounters             TrackingCounter[]             @relation("OrgTrackingCounter")
+  trackedPageDailies           TrackedPageDaily[]            @relation("OrgTrackedPageDaily")
+  formSubmissions              FormSubmission[]              @relation("OrgFormSubmission")
+  slackInstallations           SlackInstallation[]           @relation("OrgSlackInstallation")
+  slackChannels                SlackChannel[]                @relation("OrgSlackChannel")
+  slackMemberMatches           SlackMemberMatch[]            @relation("OrgSlackMemberMatch")
+  slackWorkspaceGrants         SlackWorkspaceGrant[]         @relation("OrgSlackWorkspaceGrant")
+  auditEvents                  AuditEvent[]                  @relation("OrgAuditEvent")
+
   @@unique([slug])
   @@map("organization")
 }
 
 model WorkspaceProfile {
+  organizationId String       @unique @default("")
+  organization   Organization @relation("OrgWorkspaceProfile", fields: [organizationId], references: [id], onDelete: Cascade)
+
   id String @id
 
   website   String
@@ -1479,6 +1720,7 @@ model Member {
   userId         String
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   role           String       @default("member")
+  lastActiveAt   DateTime?
   createdAt      DateTime
 
   @@unique([organizationId, userId])
@@ -1517,4 +1759,26 @@ model SsoProvider {
 
   @@unique([providerId])
   @@map("ssoProvider")
+}
+
+enum OrgStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+model AuditEvent {
+  id             String       @id @default(cuid())
+  organizationId String       @default("")
+  organization   Organization @relation("OrgAuditEvent", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  actorId   String?
+  actor     User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  type      String
+  subject   String?
+  data      Json?
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([actorId])
+  @@map("auditEvent")
 }

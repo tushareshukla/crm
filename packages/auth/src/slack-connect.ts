@@ -8,7 +8,7 @@ import {
 import * as z from "zod";
 import {
 	canManageConnections,
-	WORKSPACE_ID,
+	workspaceId,
 	WORKSPACE_ROLES,
 	workspaceRoleOf,
 } from "./organization";
@@ -41,7 +41,7 @@ export const slackConnectGuard = createAuthMiddleware(async (ctx) => {
 		workspaceRoleOf(session.user.id),
 		db.member.count({
 			where: {
-				organizationId: WORKSPACE_ID,
+				organizationId: workspaceId(),
 				role: { in: [...CONNECT_MANAGER_ROLES] },
 			},
 		}),

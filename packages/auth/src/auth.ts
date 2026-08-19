@@ -8,7 +8,11 @@ import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { organization } from "better-auth/plugins/organization";
 import { AUTH_COOKIE_PREFIX } from "./cookies";
 import { env } from "./env";
-import { ensureWorkspaceMembership } from "./organization";
+import {
+	ensureWorkspaceMembership,
+	hasPendingInvitation,
+	isPlatformAdmin,
+} from "./organization";
 import {
 	GOOGLE_PROVIDER_ID,
 	MICROSOFT_PROVIDER_ID,
@@ -213,9 +217,13 @@ export const auth = betterAuth({
 				]
 			: []),
 		organization({
+			// Orgs are created by platform admins through the admin router.
 			allowUserToCreateOrganization: false,
 			disableOrganizationDeletion: true,
 			creatorRole: "owner",
+			invitationExpiresIn: 60 * 60 * 24 * 7,
+			// Copy-link invites: nothing is emailed; the inviter is shown the link.
+			sendInvitationEmail: async () => {},
 
 			schema: {
 				organization: {
@@ -247,19 +255,18 @@ export const auth = betterAuth({
 		user: {
 			create: {
 				before: async (user) => {
-					if (!hasSignInAllowList()) {
+					// Invite-only tenancy: an account may be created by a platform
+					// admin, by someone holding a pending invitation, or (optional
+					// escape hatch) by an address on ALLOWED_SIGN_IN.
+					const allowed =
+						isPlatformAdmin(user.email) ||
+						(await hasPendingInvitation(user.email)) ||
+						(hasSignInAllowList() && isWorkspaceEmail(user.email));
+
+					if (!allowed) {
 						throw new APIError("FORBIDDEN", {
 							message:
-								'No one can sign in yet: set ALLOWED_SIGN_IN in .env to your email domain (for example ALLOWED_SIGN_IN="acme.com") and restart.',
-						});
-					}
-
-					if (!isWorkspaceEmail(user.email)) {
-						const domain = primaryWorkspaceDomain();
-						throw new APIError("FORBIDDEN", {
-							message: domain
-								? `This CRM is private. Sign in with your @${domain} account.`
-								: "This CRM is private. That address is not on the allow-list.",
+								"This CRM is invite-only. Ask an organization admin for an invitation link, or sign in with the address that was invited.",
 						});
 					}
 
