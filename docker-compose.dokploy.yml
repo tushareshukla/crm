@@ -1,0 +1,126 @@
+# Comp AI CRM on Dokploy — single image (./Dockerfile), four services + Postgres.
+# Env values come from Dokploy's Environment tab (.env interpolation).
+# Deployed from the tusharrXop/crm fork, branch `deploy`.
+x-crm-image: &crm-image crm-compai:release
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: crm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: crm
+    volumes:
+      - crm-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crm -d crm"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  migrate:
+    image: *crm-image
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        API_URL: ${API_URL}
+        APP_URL: ${APP_URL}
+    command: >
+      sh -c "cd /app/packages/db && bun x prisma migrate deploy
+      && cd /app/apps/agent
+      && if [ -n \"$$CONTEXT_DEV_API_KEY\" ]; then bun -e \"import('@crm/db').then(async m=>{const s=await import('@crm/db/settings');await s.writeContextDevKey(m.db,process.env.CONTEXT_DEV_API_KEY);console.log('[seed] Context.dev key stored in AppSetting');process.exit(0)}).catch(e=>{console.error(e);process.exit(1)})\"; else echo '[seed] CONTEXT_DEV_API_KEY empty, skipping'; fi"
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://crm:${POSTGRES_PASSWORD}@postgres:5432/crm?schema=public
+      CONTEXT_DEV_API_KEY: ${CONTEXT_DEV_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    image: *crm-image
+    pull_policy: never
+    restart: unless-stopped
+    command: sh -c "cd /app/apps/api && bun src/main.ts"
+    expose: ["3001"]
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      DATABASE_URL: postgresql://crm:${POSTGRES_PASSWORD}@postgres:5432/crm?schema=public
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      ALLOWED_SIGN_IN: ${ALLOWED_SIGN_IN}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET}
+      MICROSOFT_TENANT_ID: ${MICROSOFT_TENANT_ID}
+      SLACK_CLIENT_ID: ${SLACK_CLIENT_ID}
+      SLACK_CLIENT_SECRET: ${SLACK_CLIENT_SECRET}
+      API_URL: ${API_URL}
+      APP_URL: ${APP_URL}
+      AUTH_COOKIE_DOMAIN: ${AUTH_COOKIE_DOMAIN}
+      AGENT_URL: http://agent:2000
+      AGENT_BRIDGE_SECRET: ${AGENT_BRIDGE_SECRET}
+      CRON_SECRET: ${CRON_SECRET}
+      BLOB_READ_WRITE_TOKEN: ${BLOB_READ_WRITE_TOKEN}
+      REDIS_URL: ${REDIS_URL}
+      CRM_TELEMETRY_DISABLED: ${CRM_TELEMETRY_DISABLED}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks: [default, dokploy-network]
+
+  app:
+    image: *crm-image
+    pull_policy: never
+    restart: unless-stopped
+    command: sh -c "cd /app/apps/app && bun run start"
+    expose: ["3000"]
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: postgresql://crm:${POSTGRES_PASSWORD}@postgres:5432/crm?schema=public
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      API_URL: ${API_URL}
+      APP_URL: ${APP_URL}
+      AUTH_COOKIE_DOMAIN: ${AUTH_COOKIE_DOMAIN}
+      AGENT_URL: http://agent:2000
+      AGENT_BRIDGE_SECRET: ${AGENT_BRIDGE_SECRET}
+      IS_MARKETING: ${IS_MARKETING}
+      BLOB_READ_WRITE_TOKEN: ${BLOB_READ_WRITE_TOKEN}
+      CRM_TELEMETRY_DISABLED: ${CRM_TELEMETRY_DISABLED}
+    depends_on:
+      api:
+        condition: service_started
+    networks: [default, dokploy-network]
+
+  agent:
+    image: *crm-image
+    pull_policy: never
+    restart: unless-stopped
+    command: sh -c "cd /app/apps/agent && bun run build && bun run start"
+    expose: ["2000"]
+    environment:
+      NODE_ENV: production
+      AGENT_PORT: "2000"
+      DATABASE_URL: postgresql://crm:${POSTGRES_PASSWORD}@postgres:5432/crm?schema=public
+      API_URL: ${API_URL}
+      APP_URL: ${APP_URL}
+      AGENT_BRIDGE_SECRET: ${AGENT_BRIDGE_SECRET}
+      AI_GATEWAY_API_KEY: ${AI_GATEWAY_API_KEY}
+      PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY}
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      BLOB_READ_WRITE_TOKEN: ${BLOB_READ_WRITE_TOKEN}
+      CRM_TELEMETRY_DISABLED: ${CRM_TELEMETRY_DISABLED}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+networks:
+  dokploy-network:
+    external: true
+
+volumes:
+  crm-postgres:

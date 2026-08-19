@@ -75,8 +75,12 @@ export const auth = betterAuth({
 		provider: "postgresql",
 	}),
 
+	// Fork: fixed email + password sign-in for self-hosters without an OAuth
+	// client. Account creation still goes through the ALLOWED_SIGN_IN
+	// databaseHook below, so only allow-listed addresses can sign up.
 	emailAndPassword: {
-		enabled: false,
+		enabled: true,
+		minPasswordLength: 12,
 	},
 
 	socialProviders,
