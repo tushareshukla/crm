@@ -12,7 +12,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: crm
     volumes:
-      - crm-postgres:/var/lib/postgresql/data
+      - crm-postgres-mt:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U crm -d crm"]
       interval: 5s
@@ -124,4 +124,4 @@ networks:
     external: true
 
 volumes:
-  crm-postgres:
+  crm-postgres-mt:
