@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { type Db, Prisma } from "@crm/db";
+import { currentTenantId, type Db, Prisma } from "@crm/db";
 import type { AgentRunStatus } from "@crm/db/enums";
 import { lockIdempotencyKey } from "@crm/db/idempotency";
 import {
@@ -178,7 +178,7 @@ export class AgentRunsService {
 			>`
 					SELECT id, status, "currentVersionId"
 					FROM "agentDefinition"
-					WHERE id = ${input.id}
+					WHERE id = ${input.id} AND "organizationId" = ${currentTenantId()}
 					FOR UPDATE
 				`;
 
@@ -275,7 +275,7 @@ export class AgentRunsService {
 			>`
 					SELECT id, status, "currentVersionId"
 					FROM "agentDefinition"
-					WHERE id = ${input.id}
+					WHERE id = ${input.id} AND "organizationId" = ${currentTenantId()}
 					FOR UPDATE
 				`;
 			if (!agent || agent.status === "DELETED") {
@@ -346,7 +346,7 @@ export class AgentRunsService {
 			>`
 				SELECT id, "agentId", "versionId", status, "initiatedById", "nextEventSequence"
 				FROM "agentRun"
-				WHERE id = ${input.runId}
+				WHERE id = ${input.runId} AND "organizationId" = ${currentTenantId()}
 				FOR UPDATE
 			`;
 

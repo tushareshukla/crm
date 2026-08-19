@@ -17,6 +17,7 @@ type BridgeClaims = {
 	sub: string | undefined;
 	email: string;
 	name: string;
+	organizationId?: string;
 	iat: number;
 	nbf: number;
 	exp: number;
@@ -43,10 +44,13 @@ async function mint(claims: BridgeClaims, secret = SECRET): Promise<string> {
 	return `${signingInput}.${Buffer.from(signature).toString("base64url")}`;
 }
 
-function request(token: string | null): Request {
+function request(
+	token: string | null,
+	headers: Record<string, string> = {},
+): Request {
 	return new Request("https://agent.example.com/eve/v1/session", {
 		method: "POST",
-		headers: token ? { authorization: `Bearer ${token}` } : {},
+		headers: token ? { authorization: `Bearer ${token}`, ...headers } : headers,
 	});
 }
 
@@ -88,6 +92,34 @@ describe("repFromCrm", () => {
 		expect(session).toMatchObject({
 			attributes: { email: "lewis@trycomp.ai", name: "Lewis Carhart" },
 		});
+	});
+
+	it("carries the organization the app signed into the token, which is the session's tenant", async () => {
+		const session = await auth(
+			request(await mint(claims({ organizationId: "org_acme" }))),
+		);
+
+		expect(session).toMatchObject({
+			attributes: { organizationId: "org_acme" },
+		});
+	});
+
+	it("does not let an x-org-slug header move a token that already names its organization", async () => {
+		const session = await auth(
+			request(await mint(claims({ organizationId: "org_acme" })), {
+				"x-org-slug": "somebody-else",
+			}),
+		);
+
+		expect(session).toMatchObject({
+			attributes: { organizationId: "org_acme" },
+		});
+	});
+
+	it("leaves a token that names no organization without one, so its session fails closed on the first query", async () => {
+		const session = await auth(request(await mint(claims())));
+
+		expect(session?.attributes).not.toHaveProperty("organizationId");
 	});
 
 	it("skips a request with no token, rather than accepting it", async () => {

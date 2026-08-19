@@ -1,7 +1,7 @@
-import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { readCrmHistory } from "../lib/crm";
 import { focusOn } from "../lib/focus";
+import { defineTool } from "../lib/tenant-tool";
 
 export default defineTool({
 	description:

@@ -1,3 +1,4 @@
+import { withoutTenant } from "@crm/db";
 import {
 	Controller,
 	ForbiddenException,
@@ -48,7 +49,8 @@ export class TelemetryController {
 			throw new ForbiddenException();
 		}
 
-		return this.rollup.run();
+		// Install-level telemetry: aggregates across every organization on purpose.
+		return withoutTenant(() => this.rollup.run());
 	}
 }
 

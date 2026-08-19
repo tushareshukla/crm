@@ -1,3 +1,4 @@
+import { withoutTenant } from "@crm/db";
 import {
 	flushTelemetry,
 	onTelemetryProblem,
@@ -39,10 +40,13 @@ export class TelemetryService implements OnModuleInit, OnApplicationShutdown {
 			crmVersion: install?.version,
 		});
 
-		void this.rollup.run().catch(() => {});
+		// Install-level rollup: platform code, aggregates across organizations.
+		const run = () => withoutTenant(() => this.rollup.run()).catch(() => {});
+
+		void run();
 
 		this.timer = setInterval(() => {
-			void this.rollup.run().catch(() => {});
+			void run();
 		}, ROLLUP_INTERVAL_MS);
 
 		this.timer.unref?.();

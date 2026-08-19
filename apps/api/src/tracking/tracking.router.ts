@@ -10,6 +10,7 @@ import {
 import type { z } from "zod";
 import type { AuthedTrpcContext } from "../trpc/context.types";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
+import { TenantMiddleware } from "../trpc/middlewares/tenant.middleware";
 import {
 	addDomainInput,
 	companyActivityInput,
@@ -22,7 +23,7 @@ import {
 import { TrackingService } from "./tracking.service";
 
 @Router({ alias: "tracking" })
-@UseMiddlewares(AuthMiddleware)
+@UseMiddlewares(AuthMiddleware, TenantMiddleware)
 export class TrackingRouter {
 	constructor(
 		@Inject(TrackingService) private readonly tracking: TrackingService,

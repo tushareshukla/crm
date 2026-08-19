@@ -1,10 +1,9 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
-import { DEFAULT_WORKSPACE_NAME, workspaceId } from "@crm/auth";
+import { describe, expect } from "bun:test";
 import { db } from "@crm/db";
-import { workspaceSlug } from "@crm/db/workspace";
 import { AgentAccessService } from "../src/agent/agent-access.service";
 import { AgentRunsService } from "../src/agent/agent-runs.service";
 import { AgentTriggerService } from "../src/agent/agent-trigger.service";
+import { afterAll, afterEach, beforeAll, it, TEST_ORG } from "./tenant";
 
 const suffix = crypto.randomUUID();
 const userId = `agent-run-user-${suffix}`;
@@ -25,16 +24,6 @@ const trigger = {
 const service = new AgentRunsService(db, new AgentAccessService(db), trigger);
 
 beforeAll(async () => {
-	await db.organization.upsert({
-		where: { id: workspaceId() },
-		update: {},
-		create: {
-			id: workspaceId(),
-			name: DEFAULT_WORKSPACE_NAME,
-			slug: workspaceSlug(DEFAULT_WORKSPACE_NAME),
-			createdAt: new Date(),
-		},
-	});
 	await db.user.createMany({
 		data: [
 			{
@@ -52,7 +41,7 @@ beforeAll(async () => {
 	await db.member.create({
 		data: {
 			id: memberId,
-			organizationId: workspaceId(),
+			organizationId: TEST_ORG.id,
 			userId,
 			role: "member",
 			createdAt: new Date(),

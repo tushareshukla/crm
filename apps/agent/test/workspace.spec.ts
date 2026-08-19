@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect } from "bun:test";
 import {
 	MAX_LINE,
 	MAX_NARRATIVE,
@@ -9,6 +9,7 @@ import {
 } from "@crm/db/workspace";
 import { composeClosing } from "../agent/lib/preamble";
 import { usMarkdown, type WorkspaceIdentity } from "../agent/lib/workspace";
+import { it } from "./support/tenant";
 
 const profile: WorkspaceProfile = {
 	website: "trycomp.ai",

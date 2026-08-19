@@ -5,6 +5,7 @@ export interface RequestContext {
 	method: string;
 	path: string;
 	userId?: string;
+	organizationId?: string;
 }
 
 const storage = new AsyncLocalStorage<RequestContext>();
@@ -25,5 +26,13 @@ export function setRequestUserId(userId: string): void {
 
 	if (context) {
 		context.userId = userId;
+	}
+}
+
+export function setRequestOrganizationId(organizationId: string): void {
+	const context = storage.getStore();
+
+	if (context) {
+		context.organizationId = organizationId;
 	}
 }

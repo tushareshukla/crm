@@ -1,6 +1,16 @@
-import { db, EnrichmentStatus, type Prisma } from "@crm/db";
+import { currentTenantId, db, EnrichmentStatus, type Prisma } from "@crm/db";
 import { domainOf, isDerivedName } from "./names";
 import type { Person } from "./socials";
+
+/** Somebody in this organization to attribute the agent's writing to when a record has no owner. */
+export async function fallbackAuthorId(): Promise<string | null> {
+	const member = await db.member.findFirst({
+		where: { organizationId: currentTenantId() },
+		orderBy: { createdAt: "asc" },
+		select: { userId: true },
+	});
+	return member?.userId ?? null;
+}
 
 export type WorkItem = {
 	id: string;
@@ -357,10 +367,7 @@ export async function writeTimelineNote(
 	});
 	if (!contact) return null;
 
-	const author =
-		contact.ownerId ??
-		(await db.user.findFirst({ select: { id: true } }))?.id ??
-		null;
+	const author = contact.ownerId ?? (await fallbackAuthorId());
 	if (!author) return null;
 
 	const activity = await db.activity.create({

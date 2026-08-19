@@ -7,7 +7,7 @@ import {
 	removeAgentsNamed,
 	removeEventRuns,
 } from "./e2e-agents";
-import { E2E } from "./e2e-config";
+import { E2E, inE2eOrganization } from "./e2e-config";
 
 const COUNT = Number(process.env.E2E_LOAD_COUNT ?? E2E.load.defaultCount);
 const DRAIN_PASSES = Math.ceil(COUNT / VISIBLE_BATCH) + E2E.load.drainPassSlack;
@@ -216,4 +216,4 @@ async function main() {
 	process.exit(ok ? 0 : 1);
 }
 
-await main();
+await inE2eOrganization(main);

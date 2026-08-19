@@ -1,4 +1,4 @@
-import type { Tx } from "@crm/db";
+import { type Tx, tenantIdOrNull } from "@crm/db";
 import type { AgentRunStatus } from "@crm/db/enums";
 
 export type LockedAgentRun = {
@@ -11,14 +11,17 @@ export type LockedAgentRun = {
 	nextEventSequence: number;
 };
 
+/** A raw row lock, which the tenant extension does not see: the organization is pinned by hand. */
 export async function lockAgentRun(
 	tx: Tx,
 	runId: string,
 ): Promise<LockedAgentRun> {
+	const scope = tenantIdOrNull();
 	const [run] = await tx.$queryRaw<LockedAgentRun[]>`
 		SELECT id, "agentId", "versionId", status, "sessionId", "startedAt", "nextEventSequence"
 		FROM "agentRun"
 		WHERE id = ${runId}
+			AND (${scope}::text IS NULL OR "organizationId" = ${scope}::text)
 		FOR UPDATE
 	`;
 	if (!run) throw new Error("This agent run is unavailable.");

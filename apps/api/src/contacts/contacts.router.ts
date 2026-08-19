@@ -10,6 +10,7 @@ import {
 import type { z } from "zod";
 import type { AuthedTrpcContext } from "../trpc/context.types";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
+import { TenantMiddleware } from "../trpc/middlewares/tenant.middleware";
 import {
 	contactBulkCompanyInput,
 	contactBulkInput,
@@ -23,7 +24,7 @@ import {
 import { ContactsService } from "./contacts.service";
 
 @Router({ alias: "contacts" })
-@UseMiddlewares(AuthMiddleware)
+@UseMiddlewares(AuthMiddleware, TenantMiddleware)
 export class ContactsRouter {
 	constructor(
 		@Inject(ContactsService) private readonly contacts: ContactsService,

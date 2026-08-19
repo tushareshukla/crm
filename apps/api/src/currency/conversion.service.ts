@@ -1,5 +1,5 @@
 import type { Db, Prisma as PrismaTypes } from "@crm/db";
-import { Prisma } from "@crm/db";
+import { currentTenantId, Prisma } from "@crm/db";
 import { minorUnitsOf, normalizeCurrency } from "@crm/db/currency";
 import {
 	type Conversion,
@@ -182,13 +182,15 @@ export class ConversionService {
 			? Prisma.sql`AND ("baseAmount" IS NULL OR "baseCurrency" IS DISTINCT FROM ${base})`
 			: Prisma.empty;
 
+		// Raw SQL bypasses the tenant extension: pin the organization by hand.
 		return this.db.$executeRaw`
 			UPDATE "deal"
 			SET "baseAmount" = ROUND("amount" * ${value}::numeric, ${places}::int),
 			    "baseCurrency" = ${base},
 			    "fxRate" = ${value}::numeric,
 			    "fxRateAt" = ${rate.asOf}
-			WHERE "amount" IS NOT NULL
+			WHERE "organizationId" = ${currentTenantId()}
+			  AND "amount" IS NOT NULL
 			  AND upper(btrim("currency")) = ${code}
 			  ${filter}
 		`;
@@ -201,7 +203,8 @@ export class ConversionService {
 			    "baseCurrency" = NULL,
 			    "fxRate" = NULL,
 			    "fxRateAt" = NULL
-			WHERE upper(btrim("currency")) = ${code}
+			WHERE "organizationId" = ${currentTenantId()}
+			  AND upper(btrim("currency")) = ${code}
 			  AND "baseAmount" IS NOT NULL
 		`;
 	}

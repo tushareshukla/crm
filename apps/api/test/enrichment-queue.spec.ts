@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { describe, expect } from "bun:test";
 import { db } from "@crm/db";
 import {
 	ENRICHMENT_PAGE,
@@ -7,6 +7,7 @@ import {
 	pageSize,
 } from "@crm/validation/enrichment-queue";
 import { EnrichmentService } from "../src/enrichment/enrichment.service";
+import { afterAll, beforeAll, it } from "./tenant";
 
 const suffix = process.env.TEST_RUN_ID ?? "enrichment-queue-spec";
 const email = `queue-${suffix}@example.test`;

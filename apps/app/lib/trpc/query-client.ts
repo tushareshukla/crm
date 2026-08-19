@@ -27,12 +27,24 @@ function retryQuery(failureCount: number, error: Error): boolean {
 	return failureCount < 1;
 }
 
-let browserQueryClient: QueryClient | undefined;
+/**
+ * One cache per organization in the browser. Query keys are procedure + input
+ * and carry no organization, so a single cache would hand `/acme`'s contacts
+ * to `/globex` for a moment after switching. Keying the client by the slug in
+ * the URL keeps each organization's data in its own cache; the app's own
+ * routes (sign-in, admin, welcome…) share the unscoped one.
+ */
+const browserQueryClients = new Map<string, QueryClient>();
 
-export function getQueryClient(): QueryClient {
+export function getQueryClient(scope = ""): QueryClient {
 	if (globalThis.window === undefined) {
 		return makeQueryClient();
 	}
-	browserQueryClient ??= makeQueryClient();
-	return browserQueryClient;
+
+	let client = browserQueryClients.get(scope);
+	if (!client) {
+		client = makeQueryClient();
+		browserQueryClients.set(scope, client);
+	}
+	return client;
 }

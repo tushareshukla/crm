@@ -1,4 +1,5 @@
 import type { Db } from "@crm/db";
+import { currentTenantId } from "@crm/db";
 import { classifyTouch, type RawTouch, type Touch } from "@crm/db/attribution";
 import {
 	dedupeKey,
@@ -220,7 +221,12 @@ export class TrackingIngestService {
 		});
 
 		const submission = await this.db.formSubmission.findUnique({
-			where: { dedupeKey: key },
+			where: {
+				organizationId_dedupeKey: {
+					organizationId: currentTenantId(),
+					dedupeKey: key,
+				},
+			},
 			select: { id: true, filedAt: true, skipReason: true },
 		});
 

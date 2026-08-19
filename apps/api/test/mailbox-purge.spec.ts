@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from "bun:test";
+import { describe, expect } from "bun:test";
 import { ActivityType, db, EmailDirection, GoogleSyncStatus } from "@crm/db";
 import { ActivityStampService } from "../src/crm/activity-stamp.service";
 import { GoogleConnectionService } from "../src/google/google-connection.service";
@@ -12,6 +12,7 @@ import type { MailboxMatchService } from "../src/mailbox/mailbox-match.service";
 import { MailboxTokenService } from "../src/mailbox/mailbox-token.service";
 import { SyncStateService } from "../src/mailbox/sync-state.service";
 import { MicrosoftConnectionService } from "../src/microsoft/microsoft-connection.service";
+import { afterAll, beforeEach, it, TEST_ORG } from "./tenant";
 
 const suffix = process.env.TEST_RUN_ID ?? "mailbox-purge-spec";
 const domain = `purge-${suffix}.test`;
@@ -189,7 +190,9 @@ async function messagesOn(rootMessageId: string): Promise<string[]> {
 
 async function threadState(rootMessageId: string) {
 	return db.emailThread.findUnique({
-		where: { rootMessageId },
+		where: {
+			organizationId_rootMessageId: { organizationId: TEST_ORG.id, rootMessageId },
+		},
 		select: {
 			subject: true,
 			messageCount: true,

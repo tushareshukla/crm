@@ -1,8 +1,9 @@
-import { db, EnrichmentStatus, type Prisma } from "@crm/db";
+import { db, EnrichmentStatus, type Prisma, runWithTenant } from "@crm/db";
 import { isEnrichmentKind, MAX_ATTEMPTS } from "@crm/db/agent-tasks";
 import { DISPATCH } from "./dispatch-config";
 import { settle } from "./enrichment";
 import { retireExhausted, type TaskSubject } from "./tasks";
+import { acrossTenants } from "./tenant";
 
 const SCAN = DISPATCH.reconcile.scan;
 
@@ -38,6 +39,11 @@ export function staleTaskSweep(): StaleTaskSweep | null {
 	return lastSweep;
 }
 
+/**
+ * Retire rows that spent every attempt, and mark each one's record failed —
+ * inside the organization the row belongs to. Platform code: every
+ * organization outside a tenant, one inside it (see `retireExhausted`).
+ */
 export async function retireAbandoned(): Promise<TaskSubject[]> {
 	let abandoned: TaskSubject[] = [];
 
@@ -48,12 +54,19 @@ export async function retireAbandoned(): Promise<TaskSubject[]> {
 	}
 
 	for (const task of abandoned) {
-		await settle(task, EnrichmentStatus.FAILED, RETIRED_ERROR).catch(() => {});
+		await runWithTenant(task.organizationId, () =>
+			settle(task, EnrichmentStatus.FAILED, RETIRED_ERROR),
+		).catch(() => {});
 	}
 
 	return abandoned;
 }
 
+/**
+ * Platform sweep: every organization with open, due work is reconciled inside
+ * its own tenant, and the counters are summed. Inside a tenant (a per-org run,
+ * or a test) only that organization is swept.
+ */
 export async function reconcileStaleTasks(): Promise<StaleTaskSweep> {
 	const sweep: StaleTaskSweep = {
 		scanned: 0,
@@ -66,9 +79,22 @@ export async function reconcileStaleTasks(): Promise<StaleTaskSweep> {
 	};
 
 	try {
-		await runSweep(sweep);
+		const now = new Date();
+		for (const organizationId of await organizationsWithOpenWork(now)) {
+			try {
+				await runWithTenant(organizationId, () => runSweep(sweep, now));
+			} catch (cause) {
+				// One organization's trouble does not hold up the others; the first error is reported.
+				const reason = reasonOf(cause);
+				sweep.error ??= reason;
+				console.error(
+					`[agent] Stale task reconciliation failed for ${organizationId}: ${reason}`,
+				);
+			}
+		}
+		sweep.retired = (await retireAbandoned()).length;
 	} catch (cause) {
-		sweep.error = cause instanceof Error ? cause.message : String(cause);
+		sweep.error = reasonOf(cause);
 		console.error(`[agent] Stale task reconciliation failed: ${sweep.error}`);
 	}
 
@@ -76,14 +102,31 @@ export async function reconcileStaleTasks(): Promise<StaleTaskSweep> {
 	return sweep;
 }
 
-async function runSweep(sweep: StaleTaskSweep): Promise<void> {
-	const now = new Date();
+function reasonOf(cause: unknown): string {
+	return cause instanceof Error ? cause.message : String(cause);
+}
 
-	const where: Prisma.AgentTaskWhereInput = {
+function openWhere(now: Date): Prisma.AgentTaskWhereInput {
+	return {
 		finishedAt: null,
 		dueAt: { lte: now },
 		OR: [{ leasedUntil: null }, { leasedUntil: { lt: now } }],
 	};
+}
+
+async function organizationsWithOpenWork(now: Date): Promise<string[]> {
+	const rows = await acrossTenants(() =>
+		db.agentTask.groupBy({
+			by: ["organizationId"],
+			where: openWhere(now),
+			orderBy: { organizationId: "asc" },
+		}),
+	);
+	return rows.map((row) => row.organizationId);
+}
+
+async function runSweep(sweep: StaleTaskSweep, now: Date): Promise<void> {
+	const where = openWhere(now);
 
 	const [open, tasks] = await Promise.all([
 		db.agentTask.count({ where }),
@@ -103,8 +146,8 @@ async function runSweep(sweep: StaleTaskSweep): Promise<void> {
 		}),
 	]);
 
-	sweep.scanned = tasks.length;
-	sweep.unscanned = Math.max(0, open - tasks.length);
+	sweep.scanned += tasks.length;
+	sweep.unscanned += Math.max(0, open - tasks.length);
 
 	const completed = await completedSubjects(tasks);
 
@@ -133,10 +176,8 @@ async function runSweep(sweep: StaleTaskSweep): Promise<void> {
 			data: { finishedAt: now, outcome: LANDED_OUTCOME },
 		});
 
-		sweep.closed = count;
+		sweep.closed += count;
 	}
-
-	sweep.retired = (await retireAbandoned()).length;
 
 	if (dead.length > 0) {
 		const { count } = await db.agentTask.updateMany({
@@ -144,7 +185,7 @@ async function runSweep(sweep: StaleTaskSweep): Promise<void> {
 			data: { leasedUntil: null },
 		});
 
-		sweep.released = count;
+		sweep.released += count;
 	}
 }
 

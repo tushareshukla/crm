@@ -2,6 +2,7 @@ import { Inject } from "@nestjs/common";
 import { Input, Mutation, Query, Router, UseMiddlewares } from "nestjs-trpc";
 import type { z } from "zod";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
+import { TenantMiddleware } from "../trpc/middlewares/tenant.middleware";
 import {
 	fieldByKeyInput,
 	fieldCreateInput,
@@ -13,7 +14,7 @@ import {
 import { FieldsService } from "./fields.service";
 
 @Router({ alias: "fields" })
-@UseMiddlewares(AuthMiddleware)
+@UseMiddlewares(AuthMiddleware, TenantMiddleware)
 export class FieldsRouter {
 	constructor(@Inject(FieldsService) private readonly fields: FieldsService) {}
 

@@ -10,12 +10,13 @@ import {
 import type { z } from "zod";
 import type { AuthedTrpcContext } from "../trpc/context.types";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
+import { TenantMiddleware } from "../trpc/middlewares/tenant.middleware";
 import { setOutlookAutoCreateInput } from "./microsoft.contracts";
 import { MicrosoftConnectionService } from "./microsoft-connection.service";
 import { MicrosoftSyncService } from "./microsoft-sync.service";
 
 @Router({ alias: "microsoft" })
-@UseMiddlewares(AuthMiddleware)
+@UseMiddlewares(AuthMiddleware, TenantMiddleware)
 export class MicrosoftRouter {
 	constructor(
 		@Inject(MicrosoftConnectionService)

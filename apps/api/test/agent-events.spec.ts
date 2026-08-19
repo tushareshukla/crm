@@ -1,10 +1,11 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { describe, expect } from "bun:test";
 import { db } from "@crm/db";
 import { AgentTriggerService } from "../src/agent/agent-trigger.service";
 import { ActivityStampService } from "../src/crm/activity-stamp.service";
 import { ConversionService } from "../src/currency/conversion.service";
 import { DealsService } from "../src/deals/deals.service";
 import { FieldsService } from "../src/fields/fields.service";
+import { afterAll, beforeAll, it } from "./tenant";
 
 const suffix = crypto.randomUUID();
 const dealId = `event-deal-${suffix}`;

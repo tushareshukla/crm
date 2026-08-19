@@ -10,6 +10,7 @@ import {
 import type { z } from "zod";
 import type { AuthedTrpcContext } from "../trpc/context.types";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
+import { TenantMiddleware } from "../trpc/middlewares/tenant.middleware";
 import {
 	activityCreateInput,
 	completeInput,
@@ -20,7 +21,7 @@ import {
 import { ActivitiesService } from "./activities.service";
 
 @Router({ alias: "activities" })
-@UseMiddlewares(AuthMiddleware)
+@UseMiddlewares(AuthMiddleware, TenantMiddleware)
 export class ActivitiesRouter {
 	constructor(
 		@Inject(ActivitiesService) private readonly activities: ActivitiesService,

@@ -1,4 +1,4 @@
-import { db, FactStatus } from "@crm/db";
+import { db, FactStatus, runWithTenant } from "@crm/db";
 import {
 	canonicalValue,
 	type FactField,
@@ -7,6 +7,7 @@ import {
 	fillsBlank,
 } from "./facts";
 import { splitName } from "./names";
+import { acrossTenants } from "./tenant";
 
 const SCAN = 2000;
 
@@ -41,9 +42,52 @@ export type BlankFactSweep = {
 	fills: BlankFactFill[];
 };
 
+/**
+ * Platform sweep: every organization holding proposed facts is swept inside
+ * its own tenant and the counters are summed. Inside a tenant (a per-org run,
+ * or a test) only that organization is swept.
+ */
 export async function sweepBlankFacts(
 	options: { dry?: boolean } = {},
 ): Promise<BlankFactSweep> {
+	const sweep: BlankFactSweep = {
+		scanned: 0,
+		filled: 0,
+		settled: 0,
+		waiting: 0,
+		unscanned: 0,
+		fills: [],
+	};
+
+	for (const organizationId of await organizationsWithProposals()) {
+		const part = await runWithTenant(organizationId, () =>
+			sweepOrganization(options),
+		);
+		sweep.scanned += part.scanned;
+		sweep.filled += part.filled;
+		sweep.settled += part.settled;
+		sweep.waiting += part.waiting;
+		sweep.unscanned += part.unscanned;
+		sweep.fills.push(...part.fills);
+	}
+
+	return sweep;
+}
+
+async function organizationsWithProposals(): Promise<string[]> {
+	const rows = await acrossTenants(() =>
+		db.contactFact.groupBy({
+			by: ["organizationId"],
+			where: { status: FactStatus.PROPOSED },
+			orderBy: { organizationId: "asc" },
+		}),
+	);
+	return rows.map((row) => row.organizationId);
+}
+
+async function sweepOrganization(options: {
+	dry?: boolean;
+}): Promise<BlankFactSweep> {
 	const [pending, proposals] = await Promise.all([
 		db.contactFact.count({ where: { status: FactStatus.PROPOSED } }),
 		db.contactFact.findMany({

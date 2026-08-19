@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
+import { describe, expect } from "bun:test";
 import { db } from "@crm/db";
 import type { SendFn } from "eve/channels";
 import { z } from "zod";
@@ -19,6 +19,13 @@ import {
 	runResultOf,
 	stageRunResult,
 } from "../agent/lib/run-runtime";
+import {
+	afterAll,
+	afterEach,
+	beforeAll,
+	it,
+	TEST_ORGANIZATION,
+} from "./support/tenant";
 
 const attachmentBytes = z.object({ data: z.instanceof(Uint8Array) });
 
@@ -299,7 +306,8 @@ describe("durable custom-agent runtime", () => {
 			db.agentRun.findUniqueOrThrow({ where: { id: recoverable.id } }),
 			db.agentRun.findUniqueOrThrow({ where: { id: active.id } }),
 		]);
-		expect(pending).not.toContain(recoverable.id);
+		expect(pending.map((row) => row.id)).not.toContain(recoverable.id);
+		expect(pending.every((row) => row.organizationId)).toBe(true);
 		expect(recovered).toMatchObject({ status: "QUEUED", startedAt: null });
 		expect(
 			await db.agentRunEvent.count({
@@ -307,6 +315,30 @@ describe("durable custom-agent runtime", () => {
 			}),
 		).toBe(1);
 		expect(untouched.status).toBe("RUNNING");
+	});
+
+	it("leaves a suspended organization's queued runs where they are", async () => {
+		const run = await createRun("QUEUED", null);
+		await db.organization.update({
+			where: { id: TEST_ORGANIZATION.id },
+			data: { status: "SUSPENDED" },
+		});
+
+		try {
+			const pending = await pendingAgentRunIds();
+			expect(pending.map((row) => row.id)).not.toContain(run.id);
+		} finally {
+			await db.organization.update({
+				where: { id: TEST_ORGANIZATION.id },
+				data: { status: "ACTIVE" },
+			});
+		}
+
+		const pending = await pendingAgentRunIds();
+		expect(pending.map((row) => row.id)).toContain(run.id);
+		expect(pending.find((row) => row.id === run.id)?.organizationId).toBe(
+			TEST_ORGANIZATION.id,
+		);
 	});
 
 	it("claims one live run delivery and persists its Eve session", async () => {

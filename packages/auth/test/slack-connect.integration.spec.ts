@@ -1,3 +1,9 @@
+/**
+ * The Slack connect guard under multi-tenancy. Slack is connected per org, so
+ * the guard reads the *current tenant's* membership: every request it judges
+ * runs inside runWithTenant(orgId, …), which is what the API's tenant
+ * middleware does for a real request.
+ */
 import {
 	afterAll,
 	beforeAll,
@@ -6,19 +12,14 @@ import {
 	expect,
 	it,
 } from "bun:test";
-import { db } from "@crm/db";
-import { workspaceSlug } from "@crm/db/workspace";
+import { db, runWithTenant } from "@crm/db";
 import { type BetterAuthPlugin, betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { createAuthEndpoint, createAuthMiddleware } from "better-auth/api";
 import { applySetCookies } from "better-auth/cookies";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import * as z from "zod";
-import {
-	DEFAULT_WORKSPACE_NAME,
-	workspaceId,
-	type WorkspaceRole,
-} from "../src/organization";
+import type { WorkspaceRole } from "../src/organization";
 import { GOOGLE_PROVIDER_ID, SLACK_PROVIDER_ID } from "../src/scopes";
 import { slackConnectGuard } from "../src/slack-connect";
 
@@ -28,6 +29,13 @@ const EMAIL_SUFFIX = `.slack-connect.${suffix}@example.test`;
 const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 const BASE_URL = "http://localhost:3001";
 const JSON_HEADERS = { "content-type": "application/json" };
+
+const idOf = (label: string) => `slack-connect-${suffix}-${label}`;
+
+/** The org whose Slack is being connected … */
+const ORG = { id: idOf("org"), slug: `slack-connect-${suffix}` };
+/** … and a bystander org, to prove roles do not leak across tenants. */
+const OTHER = { id: idOf("other-org"), slug: `slack-connect-${suffix}-other` };
 
 const reached = { reached: true };
 
@@ -62,20 +70,6 @@ const guarded = betterAuth({
 const arrival = z.object({ reached: z.literal(true) });
 const refusal = z.object({ message: z.string() });
 
-type Snapshot = {
-	organization: {
-		name: string;
-		slug: string;
-		website: string | null;
-		metadata: string | null;
-	} | null;
-	members: { id: string; userId: string; role: string; createdAt: Date }[];
-};
-
-let snapshot: Snapshot;
-
-const idOf = (label: string) => `slack-connect-${suffix}-${label}`;
-
 const sessionCookie = async (userId: string): Promise<string> => {
 	const context = await guarded.$context;
 	const token = idOf(`${userId}-token`);
@@ -102,9 +96,11 @@ const sessionCookie = async (userId: string): Promise<string> => {
 	return headers.get("cookie") ?? "";
 };
 
+/** A signed-in user holding `role` in `org` (or in no org at all when `role` is null). */
 const seat = async (
 	label: string,
 	role: WorkspaceRole | null,
+	org: { id: string } = ORG,
 ): Promise<string> => {
 	const now = new Date();
 
@@ -123,7 +119,7 @@ const seat = async (
 		await db.member.create({
 			data: {
 				id: idOf(`${label}-member`),
-				organizationId: workspaceId(),
+				organizationId: org.id,
 				userId: user.id,
 				role,
 				createdAt: now,
@@ -134,92 +130,76 @@ const seat = async (
 	return sessionCookie(user.id);
 };
 
+/** Every request the guard judges is made *as the org being connected*, like the API's tenant middleware does. */
+const asOrg = <T>(fn: () => Promise<T>): Promise<T> =>
+	runWithTenant(ORG.id, fn);
+
 const startConnect = (
 	path: string,
 	cookie?: string,
 	providerId: string = SLACK_PROVIDER_ID,
 ) =>
-	guarded.handler(
-		new Request(`${BASE_URL}/api/auth${path}`, {
-			method: "POST",
-			headers: cookie ? { ...JSON_HEADERS, cookie } : JSON_HEADERS,
-			body: JSON.stringify({ providerId, callbackURL: "/" }),
-		}),
+	asOrg(() =>
+		guarded.handler(
+			new Request(`${BASE_URL}/api/auth${path}`, {
+				method: "POST",
+				headers: cookie ? { ...JSON_HEADERS, cookie } : JSON_HEADERS,
+				body: JSON.stringify({ providerId, callbackURL: "/" }),
+			}),
+		),
 	);
 
 const linkSlack = (cookie?: string) => startConnect("/oauth2/link", cookie);
 
+const callbackRequest = (cookie?: string, providerId = SLACK_PROVIDER_ID) =>
+	new Request(
+		`${BASE_URL}/api/auth/oauth2/callback/${providerId}?code=test-code&state=test-state`,
+		{ headers: cookie ? { cookie } : undefined },
+	);
+
 const completeConnect = (
 	cookie?: string,
 	providerId: string = SLACK_PROVIDER_ID,
-) =>
-	guarded.handler(
-		new Request(
-			`${BASE_URL}/api/auth/oauth2/callback/${providerId}?code=test-code&state=test-state`,
-			{ headers: cookie ? { cookie } : undefined },
-		),
-	);
+) => asOrg(() => guarded.handler(callbackRequest(cookie, providerId)));
 
 const messageOf = async (response: Response): Promise<string> =>
 	refusal.parse(await response.json()).message;
 
-const arrived = async (response: Response): Promise<boolean> =>
-	arrival.safeParse(await response.json()).success;
+const arrived = async (response: Response): Promise<boolean> => {
+	const text = await response.text();
+	try {
+		return arrival.safeParse(JSON.parse(text)).success;
+	} catch {
+		return false;
+	}
+};
 
 const clear = async () => {
-	await db.member.deleteMany({ where: { organizationId: workspaceId() } });
-	await db.organization.deleteMany({ where: { id: workspaceId() } });
+	// Orgs cascade to their members; users cascade to their sessions.
+	await db.organization.deleteMany({
+		where: { id: { in: [ORG.id, OTHER.id] } },
+	});
 	await db.user.deleteMany({ where: { email: { endsWith: EMAIL_SUFFIX } } });
 };
 
-beforeAll(async () => {
-	const organization = await db.organization.findUnique({
-		where: { id: workspaceId() },
-		select: { name: true, slug: true, website: true, metadata: true },
-	});
-
-	snapshot = {
-		organization,
-		members: await db.member.findMany({
-			where: { organizationId: workspaceId() },
-			select: { id: true, userId: true, role: true, createdAt: true },
-		}),
-	};
-});
+beforeAll(clear);
 
 beforeEach(async () => {
 	await clear();
 
-	await db.organization.create({
-		data: {
-			id: workspaceId(),
-			name: DEFAULT_WORKSPACE_NAME,
-			slug: workspaceSlug(DEFAULT_WORKSPACE_NAME),
-			createdAt: new Date(),
-		},
-	});
-});
-
-afterAll(async () => {
-	await clear();
-
-	if (snapshot.organization) {
+	for (const org of [ORG, OTHER]) {
 		await db.organization.create({
 			data: {
-				id: workspaceId(),
+				id: org.id,
+				name: org.slug,
+				slug: org.slug,
 				createdAt: new Date(),
-				...snapshot.organization,
 			},
-		});
-
-		await db.member.createMany({
-			data: snapshot.members.map((member) => ({
-				...member,
-				organizationId: workspaceId(),
-			})),
 		});
 	}
 });
+
+afterAll(clear);
 
 describe("the Slack callback that writes the connection", () => {
 	it("turns away a browser with no session", async () => {
@@ -240,6 +220,16 @@ describe("the Slack callback that writes the connection", () => {
 	it("turns away someone signed in who is not in this workspace", async () => {
 		await seat("owner", "owner");
 		const response = await completeConnect(await seat("stranger", null));
+
+		expect(response.status).toBe(403);
+		expect(await messageOf(response)).toContain("member of this workspace");
+	});
+
+	it("turns away an owner of a different org: roles do not cross tenants", async () => {
+		await seat("owner", "owner");
+		const response = await completeConnect(
+			await seat("other-owner", "owner", OTHER),
+		);
 
 		expect(response.status).toBe(403);
 		expect(await messageOf(response)).toContain("member of this workspace");
@@ -268,6 +258,43 @@ describe("the Slack callback that writes the connection", () => {
 		expect(response.status).toBe(200);
 		expect(await arrived(response)).toBe(true);
 	});
+
+	it("does not count another org's owner when deciding whether this org has a manager", async () => {
+		// ORG has only members; OTHER has an owner. The member may still connect.
+		await seat("other-owner", "owner", OTHER);
+		const response = await completeConnect(await seat("rep", "member"));
+
+		expect(response.status).toBe(200);
+		expect(await arrived(response)).toBe(true);
+	});
+
+	it("fails closed when no tenant is resolved for the request, even for an owner", async () => {
+		const cookie = await seat("founder", "owner");
+
+		// Same request, but nobody said which org it is for.
+		const response = await guarded.handler(callbackRequest(cookie));
+
+		expect(response.status).toBe(400);
+		expect(await messageOf(response)).toContain("Open the workspace");
+	});
+
+	it("fails closed when no tenant is resolved for the link request", async () => {
+		const cookie = await seat("founder", "owner");
+
+		const response = await guarded.handler(
+			new Request(`${BASE_URL}/api/auth/oauth2/link`, {
+				method: "POST",
+				headers: { ...JSON_HEADERS, cookie },
+				body: JSON.stringify({
+					providerId: SLACK_PROVIDER_ID,
+					callbackURL: "/",
+				}),
+			}),
+		);
+
+		expect(response.status).toBe(400);
+		expect(await arrived(response)).toBe(false);
+	});
 });
 
 describe("the two paths that start a Slack connection", () => {
@@ -295,6 +322,13 @@ describe("the two paths that start a Slack connection", () => {
 		expect(response.status).toBe(401);
 	});
 
+	it("turns away an admin of a different org", async () => {
+		await seat("owner", "owner");
+		const response = await linkSlack(await seat("other-lead", "admin", OTHER));
+
+		expect(response.status).toBe(403);
+	});
+
 	it("lets an admin ask to link Slack", async () => {
 		const response = await linkSlack(await seat("lead", "admin"));
 
@@ -318,6 +352,15 @@ describe("every provider that is not Slack", () => {
 
 	it("lets the Google callback through with no session at all", async () => {
 		const response = await completeConnect(undefined, GOOGLE_PROVIDER_ID);
+
+		expect(response.status).toBe(200);
+		expect(await arrived(response)).toBe(true);
+	});
+
+	it("does not need a tenant for a provider it does not guard", async () => {
+		const response = await guarded.handler(
+			callbackRequest(undefined, GOOGLE_PROVIDER_ID),
+		);
 
 		expect(response.status).toBe(200);
 		expect(await arrived(response)).toBe(true);

@@ -1,11 +1,11 @@
 import { db } from "@crm/db";
-import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { sensitiveWrite } from "../lib/approval";
 import { writeTimelineNote } from "../lib/crm";
 import { lastEmployerChange } from "../lib/facts";
 import { focusOn } from "../lib/focus";
 import { assertResearchPurpose } from "../lib/session-purpose";
+import { defineTool } from "../lib/tenant-tool";
 
 export default defineTool({
 	description:

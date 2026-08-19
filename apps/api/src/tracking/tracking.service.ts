@@ -2,10 +2,10 @@ import {
 	appUrl,
 	canManageTracking,
 	isWorkspaceRole,
-	workspaceId,
 	type WorkspaceRole,
+	workspaceId,
 } from "@crm/auth";
-import { type Db, DomainScope, Prisma } from "@crm/db";
+import { currentTenantId, type Db, DomainScope, Prisma } from "@crm/db";
 import { describeTouch } from "@crm/db/attribution";
 import { safeFetch } from "@crm/db/safe-fetch";
 import { settingsId } from "@crm/db/settings";
@@ -506,7 +506,8 @@ export class TrackingService {
 			>`
 				SELECT "firstSource", "firstMedium", count(DISTINCT "contactId") AS contacts
 				FROM "trackedVisitor"
-				WHERE "contactId" IS NOT NULL AND "firstSource" IS NOT NULL
+				WHERE "organizationId" = ${currentTenantId()}
+					AND "contactId" IS NOT NULL AND "firstSource" IS NOT NULL
 				GROUP BY 1, 2;
 			`,
 		]);

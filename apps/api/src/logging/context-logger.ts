@@ -39,6 +39,7 @@ interface JsonLogRecord {
 	stack?: unknown;
 	requestId?: string;
 	userId?: string;
+	organizationId?: string;
 }
 
 @Injectable()
@@ -71,6 +72,10 @@ export class ContextLogger extends ConsoleLogger {
 			...record,
 			requestId: request.requestId,
 		};
+
+		if (request.organizationId) {
+			correlated.organizationId = request.organizationId;
+		}
 
 		if (!request.userId) {
 			return correlated;

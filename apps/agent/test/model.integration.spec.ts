@@ -1,12 +1,4 @@
-import {
-	afterAll,
-	afterEach,
-	beforeAll,
-	beforeEach,
-	describe,
-	expect,
-	it,
-} from "bun:test";
+import { describe, expect } from "bun:test";
 import { db, type Prisma } from "@crm/db";
 import {
 	DEFAULT_AGENT_MODEL,
@@ -15,6 +7,13 @@ import {
 	writeAgentModel,
 } from "@crm/db/settings";
 import { selectedModel } from "../agent/lib/model";
+import {
+	afterAll,
+	afterEach,
+	beforeAll,
+	beforeEach,
+	it,
+} from "./support/tenant";
 
 async function clear() {
 	await db.appSetting.deleteMany({ where: { id: settingsId() } });

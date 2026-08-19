@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { workspaceId } from "@crm/auth";
-import type { Db, Tx } from "@crm/db";
+import { currentTenantId, type Db, type Tx } from "@crm/db";
 import {
 	ForbiddenException,
 	Injectable,
@@ -204,7 +204,7 @@ export class ConversationSharingService {
 		const rows = await tx.$queryRaw<Array<{ id: string }>>`
 			SELECT id
 			FROM "agentConversation"
-			WHERE id = ${conversationId}
+			WHERE id = ${conversationId} AND "organizationId" = ${currentTenantId()}
 			FOR UPDATE
 		`;
 		if (rows.length === 0) return false;

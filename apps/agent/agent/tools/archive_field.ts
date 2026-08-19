@@ -1,7 +1,7 @@
-import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { sensitiveWrite } from "../lib/approval";
 import { archiveField } from "../lib/fields";
+import { defineTool } from "../lib/tenant-tool";
 
 export default defineTool({
 	description:

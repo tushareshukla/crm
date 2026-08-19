@@ -1,9 +1,9 @@
 import { blobEnabled } from "@crm/db/blob";
-import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { spend } from "../lib/focus";
 import { runPortrait } from "../lib/portrait";
 import { assertResearchPurpose } from "../lib/session-purpose";
+import { defineTool } from "../lib/tenant-tool";
 
 export default defineTool({
 	description:

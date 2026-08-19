@@ -1,8 +1,8 @@
-import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { runBrand } from "../lib/brand";
 import { spend } from "../lib/focus";
 import { assertResearchPurpose } from "../lib/session-purpose";
+import { defineTool } from "../lib/tenant-tool";
 
 export default defineTool({
 	description:

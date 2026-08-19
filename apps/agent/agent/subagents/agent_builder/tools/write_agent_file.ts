@@ -1,10 +1,10 @@
-import { defineTool } from "eve/tools";
 import { z } from "zod";
 import {
 	BUILDER_ARTIFACT_PATHS,
 	writeBuilderArtifact,
 } from "../../../lib/builder-runtime";
 import { requireBuilderAttribute } from "../../../lib/session-purpose";
+import { defineTool } from "../../../lib/tenant-tool";
 import { assertBuilderDraftOpen } from "../lib/execution-state";
 
 export default defineTool({

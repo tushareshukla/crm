@@ -1,4 +1,4 @@
-import { db } from "@crm/db";
+import { db, tenantIdOrNull } from "@crm/db";
 import type { JsonValue } from "@crm/db/json";
 import {
 	APIError,
@@ -8,7 +8,6 @@ import {
 import * as z from "zod";
 import {
 	canManageConnections,
-	workspaceId,
 	WORKSPACE_ROLES,
 	workspaceRoleOf,
 } from "./organization";
@@ -37,11 +36,22 @@ export const slackConnectGuard = createAuthMiddleware(async (ctx) => {
 		});
 	}
 
+	// Slack is connected per organization: the request must say which one
+	// (the API's tenant middleware sets it). Resolve it once, up front — no
+	// tenant means no membership to judge, so the guard refuses.
+	const organizationId = tenantIdOrNull();
+	if (!organizationId) {
+		throw new APIError("BAD_REQUEST", {
+			message:
+				"Open the workspace you want to connect Slack to, then try again.",
+		});
+	}
+
 	const [role, managers] = await Promise.all([
-		workspaceRoleOf(session.user.id),
+		workspaceRoleOf(session.user.id, db, organizationId),
 		db.member.count({
 			where: {
-				organizationId: workspaceId(),
+				organizationId,
 				role: { in: [...CONNECT_MANAGER_ROLES] },
 			},
 		}),

@@ -1,7 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { DEFAULT_WORKSPACE_NAME, workspaceId } from "@crm/auth";
+import { describe, expect } from "bun:test";
 import { db } from "@crm/db";
-import { workspaceSlug } from "@crm/db/workspace";
 import { z } from "zod";
 import {
 	builderConversationCreateInput,
@@ -9,6 +7,7 @@ import {
 	conversationSaveInput,
 } from "../src/conversations/conversations.contracts";
 import { ConversationsService } from "../src/conversations/conversations.service";
+import { afterAll, beforeAll, it, TEST_ORG } from "./tenant";
 
 const record = z.record(z.string(), z.unknown()).catch({});
 
@@ -37,16 +36,6 @@ beforeAll(async () => {
 	await db.member.deleteMany({ where: { id: memberId } });
 	await db.user.deleteMany({ where: { id: userId } });
 	await db.contact.deleteMany({ where: { email } });
-	await db.organization.upsert({
-		where: { id: workspaceId() },
-		update: {},
-		create: {
-			id: workspaceId(),
-			name: DEFAULT_WORKSPACE_NAME,
-			slug: workspaceSlug(DEFAULT_WORKSPACE_NAME),
-			createdAt: new Date(),
-		},
-	});
 
 	await db.user.create({
 		data: { id: userId, name: "Test Rep", email: `${userId}@example.test` },
@@ -54,7 +43,7 @@ beforeAll(async () => {
 	await db.member.create({
 		data: {
 			id: memberId,
-			organizationId: workspaceId(),
+			organizationId: TEST_ORG.id,
 			userId,
 			role: "member",
 			createdAt: new Date(),

@@ -1,9 +1,16 @@
 import { describe, expect, it } from "bun:test";
+import { apiUrl } from "../src/env";
+import {
+	canConfigureSso,
+	ssoCallbackBase,
+	ssoCallbackURL,
+	ssoProviderName,
+} from "../src/sso";
 
-process.env.API_URL = "https://crm.example.test";
-
-const { canConfigureSso, ssoCallbackBase, ssoCallbackURL, ssoProviderName } =
-	await import("../src/sso");
+// `apiUrl` is fixed when src/env is first evaluated, and other specs in this
+// run load it (through src/auth) before this file does — so the expectations
+// are pinned to the resolved API origin rather than to a value set here.
+const origin = new URL(apiUrl).origin;
 
 describe("canConfigureSso", () => {
 	it("is the same answer as renaming the workspace", () => {
@@ -16,14 +23,13 @@ describe("canConfigureSso", () => {
 
 describe("ssoCallbackURL", () => {
 	it("is the API origin plus the path better-auth mounts the callback on", () => {
-		expect(ssoCallbackURL("okta")).toBe(
-			"https://crm.example.test/api/auth/sso/callback/okta",
-		);
+		expect(ssoCallbackURL("okta")).toBe(`${origin}/api/auth/sso/callback/okta`);
 	});
 
 	it("hangs off the base the settings page shows", () => {
-		expect(ssoCallbackBase()).toBe(
-			"https://crm.example.test/api/auth/sso/callback",
+		expect(ssoCallbackBase()).toBe(`${origin}/api/auth/sso/callback`);
+		expect(ssoCallbackURL("okta").startsWith(`${ssoCallbackBase()}/`)).toBe(
+			true,
 		);
 	});
 });

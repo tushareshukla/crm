@@ -3,7 +3,7 @@ import { MAX_ATTEMPTS, RETIRED_OUTCOME } from "@crm/db/agent-tasks";
 import { retireAbandoned } from "../../agent/lib/stale-tasks";
 import { claimDue } from "../../agent/lib/tasks";
 import { reasonOf } from "./e2e-agents";
-import { E2E } from "./e2e-config";
+import { E2E, inE2eOrganization } from "./e2e-config";
 
 type HeldTask = { id: string; leasedUntil: Date | null };
 
@@ -144,4 +144,4 @@ async function main() {
 	process.exit(failed === 0 ? 0 : 1);
 }
 
-await main();
+await inE2eOrganization(main);

@@ -2,11 +2,12 @@ import { Inject } from "@nestjs/common";
 import { Input, Mutation, Query, Router, UseMiddlewares } from "nestjs-trpc";
 import type { z } from "zod";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
+import { TenantMiddleware } from "../trpc/middlewares/tenant.middleware";
 import { setAgentModelInput, setResearchKeyInput } from "./settings.contracts";
 import { SettingsService } from "./settings.service";
 
 @Router({ alias: "settings" })
-@UseMiddlewares(AuthMiddleware)
+@UseMiddlewares(AuthMiddleware, TenantMiddleware)
 export class SettingsRouter {
 	constructor(
 		@Inject(SettingsService) private readonly settings: SettingsService,

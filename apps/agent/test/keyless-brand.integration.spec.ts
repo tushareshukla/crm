@@ -1,6 +1,7 @@
-import { afterEach, describe, expect, it } from "bun:test";
+import { describe, expect } from "bun:test";
 import { db, EnrichmentStatus } from "@crm/db";
 import { settle } from "../agent/lib/enrichment";
+import { afterEach, it } from "./support/tenant";
 
 /**
  * An install with no Context key still creates companies, and a `brand` task

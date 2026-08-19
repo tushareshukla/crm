@@ -1,8 +1,9 @@
-import { describe, expect, it } from "bun:test";
-import { isGoogleConfigured, workspaceId } from "@crm/auth";
+import { describe, expect } from "bun:test";
+import { isGoogleConfigured } from "@crm/auth";
 import type { Db } from "@crm/db";
 import { ForbiddenException } from "@nestjs/common";
 import { SsoService } from "../src/sso/sso.service";
+import { it, TEST_ORG } from "./tenant";
 
 type Row = {
 	providerId: string;
@@ -105,11 +106,11 @@ describe("what a provider looks like once it is saved", () => {
 		expect(provider?.callbackURL).toEndWith("/api/auth/sso/callback/okta");
 	});
 
-	it("reads only the one workspace, never an organization it was passed", async () => {
+	it("reads only the current organization, never one it was passed", async () => {
 		const { sso, seen } = service("owner", [OKTA]);
 		await sso.list(LIST);
 
-		expect(seen.providerWhere).toEqual({ organizationId: workspaceId() });
+		expect(seen.providerWhere).toEqual({ organizationId: TEST_ORG.id });
 	});
 
 	it("searches the name, the domain and the issuer", async () => {
@@ -117,7 +118,7 @@ describe("what a provider looks like once it is saved", () => {
 		await sso.list({ ...LIST, q: " acme " });
 
 		expect(seen.providerWhere).toEqual({
-			organizationId: workspaceId(),
+			organizationId: TEST_ORG.id,
 			OR: [
 				{ providerId: { contains: "acme", mode: "insensitive" } },
 				{ domain: { contains: "acme", mode: "insensitive" } },

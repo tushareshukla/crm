@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { describe, expect } from "bun:test";
 import { db } from "@crm/db";
 import { DIRECT_KINDS, isDirectKind, PRIORITY } from "@crm/db/agent-tasks";
 import { claimDue } from "../agent/lib/tasks";
+import { afterEach, beforeEach, it } from "./support/tenant";
 
 const REASON = "lane-test";
 const TEST_PRIORITY_OFFSET = 1_000_000;

@@ -8,9 +8,8 @@ import {
 	RecordSource,
 } from "@crm/db";
 import { RETIRED_OUTCOME } from "@crm/db/agent-tasks";
-import { readAgentModel } from "@crm/db/settings";
+import { DEFAULT_AGENT_MODEL } from "@crm/db/settings";
 import { CONTACT_CAP_REASON } from "@crm/db/tracking";
-import { workspaceId } from "@crm/db/workspace";
 import {
 	bucket,
 	claimRollup,
@@ -62,6 +61,7 @@ export class RollupService {
 		private readonly funnel: FunnelService,
 	) {}
 
+	/** Install-level: callers run this inside `withoutTenant` — the numbers cover every organization. */
 	async run(force = false): Promise<RollupOutcome> {
 		if (telemetryDisabled()) {
 			return { sent: false, reason: "telemetry is off", milestones: [] };
@@ -134,14 +134,29 @@ export class RollupService {
 	}
 
 	private async shape(): Promise<Properties> {
-		const [model, members, ssoProviders, postgres, contextKey] =
+		const [settings, members, ssoProviders, postgres, contextKey] =
 			await Promise.all([
-				readAgentModel(this.db).catch(() => null),
-				this.db.member.count({ where: { organizationId: workspaceId() } }),
+				this.db.appSetting.findFirst({
+					where: { agentModelId: { not: null } },
+					select: { agentModelId: true, agentModelContextWindow: true },
+				}),
+				this.db.member.count(),
 				this.db.ssoProvider.count(),
 				this.postgresMajor(),
-				this.db.appSetting.findFirst({ select: { contextDevApiKey: true } }),
+				this.db.appSetting.findFirst({
+					where: { contextDevApiKey: { not: null } },
+					select: { contextDevApiKey: true },
+				}),
 			]);
+
+		const model = settings?.agentModelId
+			? {
+					id: settings.agentModelId,
+					contextWindowTokens:
+						settings.agentModelContextWindow ??
+						DEFAULT_AGENT_MODEL.contextWindowTokens,
+				}
+			: { ...DEFAULT_AGENT_MODEL };
 
 		return {
 			node_version: process.versions.node.split(".")[0] ?? null,
@@ -161,8 +176,8 @@ export class RollupService {
 			cap_sso_provider: ssoProviders > 0,
 			is_marketing: process.env.IS_MARKETING === "true",
 
-			agent_model_id: model?.id ?? null,
-			agent_model_context_window: model?.contextWindowTokens ?? null,
+			agent_model_id: model.id,
+			agent_model_context_window: model.contextWindowTokens,
 		};
 	}
 

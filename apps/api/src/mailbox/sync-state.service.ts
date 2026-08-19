@@ -39,6 +39,17 @@ export class SyncStateService {
 		return this.db.mailboxSync.findMany({ where });
 	}
 
+	/** Everyone who has a sync row for one of `sources` in the current organization. */
+	async connectedUserIds(sources: readonly SyncSource[]): Promise<string[]> {
+		const rows = await this.db.mailboxSync.findMany({
+			where: { source: { in: [...sources] } },
+			select: { userId: true },
+			distinct: ["userId"],
+		});
+
+		return rows.map((row) => row.userId);
+	}
+
 	async due(now: Date): Promise<MailboxSync[]> {
 		return this.db.mailboxSync.findMany({
 			where: dueWhere(now),

@@ -1,8 +1,8 @@
-import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { enabled, unavailable } from "../lib/capabilities";
 import { spend } from "../lib/focus";
 import { ask } from "../lib/perplexity";
+import { defineTool } from "../lib/tenant-tool";
 
 export default defineTool({
 	description:

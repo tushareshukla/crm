@@ -1,6 +1,6 @@
-import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { listDeals } from "../lib/lookup";
+import { defineTool } from "../lib/tenant-tool";
 
 export default defineTool({
 	description:

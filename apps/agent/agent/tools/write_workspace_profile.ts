@@ -4,10 +4,10 @@ import {
 	MAX_NARRATIVE,
 	writeWorkspaceProfile,
 } from "@crm/db/workspace";
-import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { currentFocus } from "../lib/focus";
 import { assertResearchPurpose } from "../lib/session-purpose";
+import { defineTool } from "../lib/tenant-tool";
 import { identity } from "../lib/workspace";
 
 const line = (what: string) =>

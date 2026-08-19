@@ -1,5 +1,5 @@
 import type { IncomingMessage } from "node:http";
-import type { Db } from "@crm/db";
+import { type Db, runWithTenant, withoutTenant } from "@crm/db";
 import {
 	EVENT_RETENTION_DAYS,
 	isSiteId,
@@ -24,6 +24,7 @@ import type { Response } from "express";
 import { z } from "zod";
 import type { EnvironmentVariables } from "../config/env.validation";
 import { InjectDatabase } from "../database/database.constants";
+import { forEachActiveOrganization } from "../tenancy/organizations";
 import { TrackingConfigService } from "./tracking-config.service";
 import { TrackingCounterService } from "./tracking-counter.service";
 import {
@@ -62,7 +63,13 @@ export class TrackingController {
 	async publicConfig(@Param("siteId") siteId: string) {
 		if (!isSiteId(siteId)) return { config: null };
 
-		const compiled = await this.config.forSite(siteId);
+		// The site id names the organization; everything after runs in its scope.
+		const organizationId = await this.config.organizationForSite(siteId);
+		if (!organizationId) return { config: null };
+
+		const compiled = await runWithTenant(organizationId, () =>
+			this.config.forSite(siteId),
+		);
 
 		return compiled
 			? { config: compiled.config, hash: compiled.hash }
@@ -93,10 +100,17 @@ export class TrackingController {
 		if (!isSiteId(batch?.siteId) || !Array.isArray(batch?.events)) return;
 
 		try {
-			await this.ingest.accept(batch, {
-				origin: origin ?? null,
-				userAgent: userAgent ?? null,
-			});
+			const organizationId = await this.config.organizationForSite(
+				batch.siteId,
+			);
+			if (!organizationId) return;
+
+			await runWithTenant(organizationId, () =>
+				this.ingest.accept(batch, {
+					origin: origin ?? null,
+					userAgent: userAgent ?? null,
+				}),
+			);
 		} catch (error) {
 			this.logger.error(
 				{ message: "Tracking event was not stored" },
@@ -148,10 +162,21 @@ export class TrackingRetentionController {
 			new Date(Date.now() - EVENT_RETENTION_DAYS * 24 * 60 * 60_000),
 		);
 
-		const rolled = await this.rollups.run(before);
+		// Cron. Daily rollups are per organization (they write tenant rows); the
+		// sweeps below are platform housekeeping over rows that are already past
+		// retention, whichever organization they belong to.
+		const rollups = await forEachActiveOrganization(
+			this.db,
+			() => this.rollups.run(before),
+			this.logger,
+		);
+		const rolled = rollups.reduce(
+			(sum, outcome) => sum + (outcome.ok ? outcome.result : 0),
+			0,
+		);
 		const { removed, complete } = await this.sweepEvents(before);
 		const visitors = await this.sweepVisitors(before);
-		const counters = await this.counters.sweep();
+		const counters = await withoutTenant(() => this.counters.sweep());
 
 		if (!complete) {
 			this.logger.warn({

@@ -33,15 +33,24 @@ export class ImageMirrorService {
 
 	constructor(@InjectDatabase() private readonly db: Db) {}
 
+	/** One organization's companies and contacts — runs inside tenant scope. */
 	async sweep(): Promise<ImageMirrorResult> {
 		if (!blobEnabled()) return { scanned: 0, copied: 0 };
 
-		const results = [
+		return this.total([
 			await this.sweepCompanies(),
 			await this.sweepContacts(),
-			await this.sweepUsers(),
-		];
+		]);
+	}
 
+	/** Avatars: User is global, so this runs once per pass, not per organization. */
+	async sweepAvatars(): Promise<ImageMirrorResult> {
+		if (!blobEnabled()) return { scanned: 0, copied: 0 };
+
+		return this.total([await this.sweepUsers()]);
+	}
+
+	private total(results: ImageMirrorResult[]): ImageMirrorResult {
 		const total = results.reduce(
 			(sum, result) => ({
 				scanned: sum.scanned + result.scanned,

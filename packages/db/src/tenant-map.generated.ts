@@ -595,7 +595,12 @@ export const TENANT_COMPOUND_UNIQUES: Record<TenantModel, readonly (readonly str
  ],
  "FieldOption": [],
  "FieldValue": [],
- "FormSubmission": [],
+ "FormSubmission": [
+  [
+   "organizationId",
+   "dedupeKey"
+  ]
+ ],
  "MailboxSync": [
   [
    "organizationId",

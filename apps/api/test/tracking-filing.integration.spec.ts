@@ -1,11 +1,4 @@
-import {
-	afterAll,
-	beforeAll,
-	beforeEach,
-	describe,
-	expect,
-	it,
-} from "bun:test";
+import { describe, expect } from "bun:test";
 import { db } from "@crm/db";
 import {
 	CONTACT_CAP_REASON,
@@ -15,9 +8,13 @@ import {
 import type { AgentTriggerService } from "../src/agent/agent-trigger.service";
 import { CompanyDirectoryService } from "../src/companies/company-directory.service";
 import { ActivityStampService } from "../src/crm/activity-stamp.service";
-import { TrackingCounterService } from "../src/tracking/tracking-counter.service";
+import {
+	scopedCounterKey,
+	TrackingCounterService,
+} from "../src/tracking/tracking-counter.service";
 import { TrackingFilingService } from "../src/tracking/tracking-filing.service";
 import { withDiscardedCrmEvents } from "./agent-trigger.stub";
+import { afterAll, beforeAll, beforeEach, it, TEST_ORG } from "./tenant";
 
 const suffix = process.env.TEST_RUN_ID ?? "filing-spec";
 const domain = `visitors-${suffix}.test`;
@@ -40,6 +37,11 @@ const directory = new CompanyDirectoryService(agent);
 const filing = new TrackingFilingService(db, counters, directory, agent, stamp);
 
 let userId: string;
+
+/** Contact email is unique per organization now. */
+const byEmail = (email: string) => ({
+	organizationId_email: { organizationId: TEST_ORG.id, email },
+});
 
 async function submit(email: string | null, name: string | null = "Dana Reed") {
 	const row = await db.formSubmission.create({
@@ -159,7 +161,7 @@ describe("filing a form submission", () => {
 		expect(stored?.filedAt).not.toBeNull();
 
 		const contact = await db.contact.findUnique({
-			where: { email: `free-${suffix}@gmail.com` },
+			where: byEmail(`free-${suffix}@gmail.com`),
 			select: { companyId: true, source: true },
 		});
 
@@ -176,7 +178,7 @@ describe("filing a form submission", () => {
 		expect(queued).toHaveLength(1);
 
 		const contact = await db.contact.findUnique({
-			where: { email },
+			where: byEmail(email),
 			select: { companyId: true, firstName: true },
 		});
 
@@ -251,7 +253,7 @@ describe("filing a form submission", () => {
 		expect(await db.contact.count({ where: { email } })).toBe(1);
 
 		const counter = await db.trackingCounter.findUnique({
-			where: { key: contactWindowKey() },
+			where: { key: scopedCounterKey(contactWindowKey()) },
 			select: { value: true },
 		});
 
@@ -276,9 +278,9 @@ describe("filing a form submission", () => {
 
 	it("stores but does not file once the hourly cap is reached", async () => {
 		await db.trackingCounter.upsert({
-			where: { key: contactWindowKey() },
+			where: { key: scopedCounterKey(contactWindowKey()) },
 			create: {
-				key: contactWindowKey(),
+				key: scopedCounterKey(contactWindowKey()),
 				value: CONTACTS_PER_HOUR,
 				expiresAt: new Date(Date.now() + 3_600_000),
 			},
@@ -302,17 +304,23 @@ describe("the hourly counter", () => {
 		expect(await counters.take(key, 2)).toBe(false);
 		expect(await counters.take(key, 2)).toBe(false);
 
-		await db.trackingCounter.deleteMany({ where: { key } });
+		await db.trackingCounter.deleteMany({
+			where: { key: scopedCounterKey(key) },
+		});
 	});
 
 	it("keeps a fixed window rather than sliding on every write", async () => {
 		const key = contactWindowKey();
 
 		await counters.take(key, 10);
-		const first = await db.trackingCounter.findUnique({ where: { key } });
+		const first = await db.trackingCounter.findUnique({
+			where: { key: scopedCounterKey(key) },
+		});
 
 		await counters.take(key, 10);
-		const second = await db.trackingCounter.findUnique({ where: { key } });
+		const second = await db.trackingCounter.findUnique({
+			where: { key: scopedCounterKey(key) },
+		});
 
 		expect(second?.expiresAt.getTime()).toBe(first?.expiresAt.getTime() ?? 0);
 		expect(second?.value).toBe(2);

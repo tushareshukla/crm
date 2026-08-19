@@ -1,16 +1,16 @@
 import {
 	canChangeRole,
 	canRenameWorkspace,
-	ensureWorkspaceMembership,
 	isWorkspaceRole,
-	workspaceId,
 	type WorkspaceRole,
+	workspaceId,
 	workspaceRoleOf,
 } from "@crm/auth";
-import type { Db, Prisma } from "@crm/db";
+import { type Db, Prisma } from "@crm/db";
 import { isOnboarded, markOnboarded, workspaceSlug } from "@crm/db/workspace";
 import {
 	BadRequestException,
+	ConflictException,
 	ForbiddenException,
 	Injectable,
 	Logger,
@@ -18,6 +18,7 @@ import {
 	ServiceUnavailableException,
 } from "@nestjs/common";
 import { AgentTriggerService } from "../agent/agent-trigger.service";
+import { AuditService } from "../audit/audit.service";
 import { normalizeDomain } from "../companies/domain";
 import { InjectDatabase } from "../database/database.constants";
 import {
@@ -38,9 +39,12 @@ export interface Workspace {
 	id: string;
 	slug: string;
 	name: string;
+	logo: string | null;
 	website: string | null;
 	onboarded: boolean;
 	viewerRole: WorkspaceRole | null;
+	/** A platform admin who is not a member is looking at this organization. */
+	supportMode: boolean;
 	canRename: boolean;
 	canChangeRoles: boolean;
 }
@@ -84,15 +88,15 @@ export class WorkspaceService {
 	constructor(
 		@InjectDatabase() private readonly db: Db,
 		private readonly agent: AgentTriggerService,
+		private readonly audit: AuditService,
 	) {}
 
-	async get(userId: string): Promise<Workspace> {
-		let row = await this.readWorkspace();
-
-		if (!row) {
-			await ensureWorkspaceMembership(userId);
-			row = await this.readWorkspace();
-		}
+	/**
+	 * The current organization (the tenant). `supportMode` is a platform admin
+	 * who entered without being a member; they may administer it.
+	 */
+	async get(userId: string, supportMode = false): Promise<Workspace> {
+		const row = await this.readWorkspace();
 
 		if (!row) {
 			throw new ServiceUnavailableException(
@@ -106,21 +110,24 @@ export class WorkspaceService {
 			id: row.id,
 			slug: row.slug,
 			name: row.name,
+			logo: row.logo,
 			website: row.website,
 			onboarded: isOnboarded(row.metadata),
 			viewerRole: role,
-			canRename: canRenameWorkspace(role),
-			canChangeRoles: canChangeRole(role),
+			supportMode,
+			canRename: supportMode || canRenameWorkspace(role),
+			canChangeRoles: supportMode || canChangeRole(role),
 		};
 	}
 
 	async update(
 		userId: string,
 		input: UpdateWorkspaceInput,
+		supportMode = false,
 	): Promise<Workspace> {
 		const role = await workspaceRoleOf(userId);
 
-		if (!canRenameWorkspace(role)) {
+		if (!supportMode && !canRenameWorkspace(role)) {
 			throw new ForbiddenException(
 				"Only an owner or an admin can change the workspace.",
 			);
@@ -128,7 +135,7 @@ export class WorkspaceService {
 
 		const before = await this.db.organization.findUnique({
 			where: { id: workspaceId() },
-			select: { website: true, metadata: true },
+			select: { name: true, slug: true, website: true, metadata: true },
 		});
 
 		const website = normalizeDomain(input.website);
@@ -139,17 +146,42 @@ export class WorkspaceService {
 			);
 		}
 
-		await this.db.organization.update({
-			where: { id: workspaceId() },
-			data: {
-				name: input.name,
-				slug: workspaceSlug(input.slug ?? input.name),
-				website,
-				metadata: markOnboarded(before?.metadata ?? null, new Date()),
-			},
-		});
+		const slug = workspaceSlug(input.slug ?? input.name);
+
+		try {
+			await this.db.organization.update({
+				where: { id: workspaceId() },
+				data: {
+					name: input.name,
+					slug,
+					website,
+					metadata: markOnboarded(before?.metadata ?? null, new Date()),
+				},
+			});
+		} catch (error) {
+			if (
+				error instanceof Prisma.PrismaClientKnownRequestError &&
+				error.code === "P2002"
+			) {
+				throw new ConflictException(
+					"That address is taken by another organization. Pick another.",
+				);
+			}
+			throw error;
+		}
 
 		this.logger.log({ message: "Workspace updated", userId });
+
+		await this.audit.tryRecord({
+			type: "org.updated",
+			actorId: userId,
+			subject: workspaceId(),
+			data: {
+				...(before?.name !== input.name ? { name: input.name } : {}),
+				...(before?.slug !== slug ? { slug } : {}),
+				...(before?.website !== website ? { website } : {}),
+			},
+		});
 
 		if (website !== before?.website) {
 			await this.agent.workspaceChanged(
@@ -160,7 +192,7 @@ export class WorkspaceService {
 			);
 		}
 
-		return this.get(userId);
+		return this.get(userId, supportMode);
 	}
 
 	async members(
@@ -196,10 +228,11 @@ export class WorkspaceService {
 	async setMemberRole(
 		userId: string,
 		input: SetMemberRoleInput,
+		supportMode = false,
 	): Promise<WorkspaceMember> {
 		const role = await workspaceRoleOf(userId);
 
-		if (!canChangeRole(role)) {
+		if (!supportMode && !canChangeRole(role)) {
 			throw new ForbiddenException(
 				"Only an owner or an admin can change a member's role.",
 			);
@@ -241,6 +274,13 @@ export class WorkspaceService {
 			userId,
 			memberId: updated.id,
 			role: input.role,
+		});
+
+		await this.audit.tryRecord({
+			type: "member.role_changed",
+			actorId: userId,
+			subject: updated.userId,
+			data: { memberId: updated.id, role: input.role },
 		});
 
 		return this.toMember(updated, userId);
@@ -292,6 +332,7 @@ export class WorkspaceService {
 				id: true,
 				slug: true,
 				name: true,
+				logo: true,
 				website: true,
 				metadata: true,
 			},

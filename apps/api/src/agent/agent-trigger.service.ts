@@ -1,4 +1,10 @@
-import { type Db, type FieldEntity, Prisma, type Tx } from "@crm/db";
+import {
+	type Db,
+	type FieldEntity,
+	Prisma,
+	type Tx,
+	withoutTenant,
+} from "@crm/db";
 import { PRIORITY } from "@crm/db/agent-tasks";
 import { CRM_EVENT_CATALOG, type CrmEventType } from "@crm/db/crm-events";
 import { lockIdempotencyKey } from "@crm/db/idempotency";
@@ -255,22 +261,25 @@ export class AgentTriggerService {
 		void this.deliverCancellation(runId);
 	}
 
+	/** Heartbeat: a platform dispatch loop — reads run ids across organizations, nothing else. */
 	async redeliverCancellations(): Promise<void> {
 		try {
 			const since = new Date(
 				Date.now() - AGENT_DISPATCH.cancel.redeliverWithinMs,
 			);
-			const runs = await this.db.agentRun.findMany({
-				where: {
-					status: "CANCELLED",
-					errorCode: AGENT_DISPATCH.cancel.errorCode,
-					startedAt: { not: null },
-					finishedAt: { gte: since },
-				},
-				orderBy: { finishedAt: "desc" },
-				take: AGENT_DISPATCH.cancel.redeliverBatch,
-				select: { id: true },
-			});
+			const runs = await withoutTenant(() =>
+				this.db.agentRun.findMany({
+					where: {
+						status: "CANCELLED",
+						errorCode: AGENT_DISPATCH.cancel.errorCode,
+						startedAt: { not: null },
+						finishedAt: { gte: since },
+					},
+					orderBy: { finishedAt: "desc" },
+					take: AGENT_DISPATCH.cancel.redeliverBatch,
+					select: { id: true },
+				}),
+			);
 
 			const outstanding = new Set(runs.map((run) => run.id));
 			for (const runId of this.cancellationsDelivered) {

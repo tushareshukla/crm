@@ -1,6 +1,7 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { describe, expect } from "bun:test";
 import { db } from "@crm/db";
 import { AgentQueueService } from "../src/agent/agent-queue.service";
+import { afterAll, beforeAll, it } from "./tenant";
 
 const suffix = process.env.TEST_RUN_ID ?? "agent-queue-spec";
 const email = `badge-${suffix}@example.test`;

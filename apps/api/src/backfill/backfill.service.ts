@@ -8,6 +8,7 @@ import type { Cache } from "cache-manager";
 import { AgentTriggerService } from "../agent/agent-trigger.service";
 import { FaviconService } from "../companies/favicon.service";
 import { InjectDatabase } from "../database/database.constants";
+import { forEachActiveOrganization } from "../tenancy/organizations";
 import { ImageMirrorService } from "./image-mirror.service";
 
 export type BackfillScope = "companies" | "contacts" | "deals";
@@ -62,25 +63,40 @@ export class BackfillService implements OnModuleInit {
 		});
 	}
 
+	/**
+	 * Runs on sign-in (no tenant context): a platform loop that sweeps every
+	 * active organization inside its own scope, then the global avatars once.
+	 */
 	async auto(): Promise<{ started: boolean }> {
 		if (await this.cache.get(AUTO_KEY)) return { started: false };
 		await this.cache.set(AUTO_KEY, true, AUTO_EVERY_MS);
 
 		void (async () => {
 			try {
-				await this.sweepWorkspace();
+				const outcomes = await forEachActiveOrganization(
+					this.db,
+					() => this.sweepOrganization(),
+					this.logger,
+				);
 
-				const companies = await this.runCompanies(false);
-				const contacts = await this.runContacts();
+				const avatars = await this.images.sweepAvatars();
 
-				const mirrored = await this.images.sweep();
+				const swept = outcomes.flatMap((outcome) =>
+					outcome.ok ? [outcome.result] : [],
+				);
 
 				this.logger.log({
 					message: "Automatic backfill swept",
-					queued: companies.queued + contacts.queued,
-					remaining: companies.remaining + contacts.remaining,
-					iconsResolving: companies.iconsResolving,
-					imagesMirrored: mirrored.copied,
+					organizations: outcomes.length,
+					queued: swept.reduce((sum, row) => sum + row.queued, 0),
+					remaining: swept.reduce((sum, row) => sum + row.remaining, 0),
+					iconsResolving: swept.reduce(
+						(sum, row) => sum + row.iconsResolving,
+						0,
+					),
+					imagesMirrored:
+						swept.reduce((sum, row) => sum + row.imagesMirrored, 0) +
+						avatars.copied,
 				});
 			} catch (error) {
 				this.logger.error(
@@ -91,6 +107,24 @@ export class BackfillService implements OnModuleInit {
 		})();
 
 		return { started: true };
+	}
+
+	private async sweepOrganization(): Promise<
+		BackfillResult & { imagesMirrored: number }
+	> {
+		await this.sweepWorkspace();
+
+		const companies = await this.runCompanies(false);
+		const contacts = await this.runContacts();
+		const mirrored = await this.images.sweep();
+
+		return {
+			queued: companies.queued + contacts.queued,
+			alreadyQueued: companies.alreadyQueued + contacts.alreadyQueued,
+			remaining: companies.remaining + contacts.remaining,
+			iconsResolving: companies.iconsResolving,
+			imagesMirrored: mirrored.copied,
+		};
 	}
 
 	private async sweepWorkspace(): Promise<void> {

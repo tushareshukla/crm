@@ -24,6 +24,9 @@ const RATES_ATTEMPTS = 2;
 
 const RETRY_DELAY_MS = 400;
 
+/** Organizations sharing a base currency share one fetch per cron tick. */
+const QUOTES_MEMO_MS = 60_000;
+
 export interface RateRefresh {
 	ok: boolean;
 	base: string;
@@ -65,6 +68,11 @@ function wait(ms: number): Promise<void> {
 @Injectable()
 export class RatesService {
 	private readonly logger = new Logger(RatesService.name);
+
+	private readonly quotes = new Map<
+		string,
+		{ at: number; value: { rates: Map<string, Prisma.Decimal>; asOf: Date } }
+	>();
 
 	constructor(@InjectDatabase() private readonly db: Db) {}
 
@@ -162,9 +170,15 @@ export class RatesService {
 	private async fetch(
 		base: string,
 	): Promise<{ rates: Map<string, Prisma.Decimal>; asOf: Date } | null> {
+		const memo = this.quotes.get(base);
+		if (memo && Date.now() - memo.at < QUOTES_MEMO_MS) return memo.value;
+
 		for (let attempt = 1; attempt <= RATES_ATTEMPTS; attempt += 1) {
 			const quotes = await this.attempt(base, attempt);
-			if (quotes) return quotes;
+			if (quotes) {
+				this.quotes.set(base, { at: Date.now(), value: quotes });
+				return quotes;
+			}
 
 			if (attempt < RATES_ATTEMPTS) await wait(RETRY_DELAY_MS);
 		}

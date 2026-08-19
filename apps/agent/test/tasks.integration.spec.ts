@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { describe, expect } from "bun:test";
 import { db } from "@crm/db";
 import { DIRECT_KINDS } from "@crm/db/agent-tasks";
 import {
@@ -8,6 +8,7 @@ import {
 	retireExhausted,
 	scheduleTask,
 } from "../agent/lib/tasks";
+import { afterEach, beforeEach, it } from "./support/tenant";
 
 const kind = "test-lease";
 

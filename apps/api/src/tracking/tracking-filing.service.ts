@@ -1,7 +1,7 @@
 import { workspaceDomains } from "@crm/auth";
 import {
-	currentTenantId,
 	ActivityType,
+	currentTenantId,
 	type Db,
 	Prisma,
 	RecordSource,
@@ -225,7 +225,9 @@ export class TrackingFilingService {
 		const last = columns(context.lastTouch, "last");
 
 		await this.db.trackedVisitor.upsert({
-			where: { id: visitorId },
+			where: {
+				organizationId_id: { organizationId: currentTenantId(), id: visitorId },
+			},
 			create: { id: visitorId, contactId, ...first, ...last },
 			update: { contactId, ...last },
 		});

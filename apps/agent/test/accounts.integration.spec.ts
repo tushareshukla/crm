@@ -1,6 +1,7 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { describe, expect } from "bun:test";
 import { ActivityType, DealStage, db, EmailDirection } from "@crm/db";
 import { readCompanyHistory, readDealHistory } from "../agent/lib/accounts";
+import { afterAll, beforeAll, it } from "./support/tenant";
 
 const suffix = process.env.TEST_RUN_ID ?? "accounts-spec";
 const domain = `fernhill-${suffix}.test`;

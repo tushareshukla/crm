@@ -101,6 +101,9 @@ function scopeUpdateData(
 ): unknown {
 	if (!isObject(data)) return data;
 	const out: AnyRecord = { ...data };
+	// A row can never be re-homed: drop any attempt to change its organization.
+	delete out.organizationId;
+	delete out.organization;
 	scopeNestedWrites(model, out, org);
 	return out;
 }
@@ -119,7 +122,7 @@ function scopeNestedWrites(
 		if (isObject(next.createMany) && "data" in next.createMany)
 			next.createMany = {
 				...next.createMany,
-				data: scopeCreate(target, next.createMany.data, org),
+				data: scopeCreate(target, next.createMany.data, org, true),
 			};
 		if ("connectOrCreate" in next) {
 			const coc = next.connectOrCreate;
@@ -195,7 +198,25 @@ function scopeSelection(
 	const lists = TENANT_LIST_RELATIONS[model] ?? {};
 	const nested = model in TENANT ? TENANT_RELATIONS[model as TenantModel] : {};
 	const out: AnyRecord = { ...selection };
+	// `_count: { select: { <listRelation>: true | { where } } }` counts like the list does
+	if (isObject(out._count) && isObject(out._count.select)) {
+		const countSelect: AnyRecord = { ...out._count.select };
+		for (const [field, value] of Object.entries(countSelect)) {
+			const listTarget = lists[field];
+			if (!listTarget || value === false || value === undefined) continue;
+			const args: AnyRecord = isObject(value) ? { ...value } : {};
+			args.where = {
+				AND: [
+					{ organizationId: org },
+					...(isObject(args.where) ? [args.where] : []),
+				],
+			};
+			countSelect[field] = args;
+		}
+		out._count = { ...out._count, select: countSelect };
+	}
 	for (const [field, value] of Object.entries(out)) {
+		if (field === "_count") continue;
 		const listTarget = lists[field];
 		const target = listTarget ?? nested?.[field];
 		if (!target || value === false || value === undefined) continue;

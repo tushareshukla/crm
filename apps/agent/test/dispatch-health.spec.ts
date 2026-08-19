@@ -90,6 +90,7 @@ async function flush(): Promise<void> {
 function directTask(overrides: Partial<LeasedTask> = {}): LeasedTask {
 	return {
 		id: "task_direct",
+		organizationId: "org_dispatch_health",
 		contactId: null,
 		companyId: null,
 		dealId: null,

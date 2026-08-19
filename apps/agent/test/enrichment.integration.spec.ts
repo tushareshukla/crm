@@ -1,6 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { describe, expect } from "bun:test";
 import { db, EnrichmentStatus } from "@crm/db";
 import { markRunning, settle } from "../agent/lib/enrichment";
+import { afterEach, beforeEach, it } from "./support/tenant";
 
 const domain = "lifecycle.example.test";
 

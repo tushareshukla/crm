@@ -1,6 +1,6 @@
-import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { createField, updateFieldBrief } from "../lib/fields";
+import { defineTool } from "../lib/tenant-tool";
 
 export default defineTool({
 	description:

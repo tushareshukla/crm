@@ -1,4 +1,3 @@
-import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { personForVerification } from "../lib/crm";
 import type { Evidence } from "../lib/evidence";
@@ -6,6 +5,7 @@ import { recordFact } from "../lib/facts";
 import { focusOn } from "../lib/focus";
 import { assertResearchPurpose } from "../lib/session-purpose";
 import { parseSocialUrl, verifyGithub, verifyX } from "../lib/socials";
+import { defineTool } from "../lib/tenant-tool";
 
 export default defineTool({
 	description:

@@ -1,6 +1,6 @@
 import {
-	currentTenantId,
 	ActivityType,
+	currentTenantId,
 	type Db,
 	GoogleSyncStatus,
 	type MailboxSyncModel as MailboxSync,

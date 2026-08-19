@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { describe, expect } from "bun:test";
 import { DealStage, db, RateSource } from "@crm/db";
 import { normalizeCurrency } from "@crm/db/currency";
 import { settingsId, writeReportingCurrency } from "@crm/db/settings";
@@ -9,6 +9,7 @@ import { DashboardService } from "../src/dashboard/dashboard.service";
 import { DealsService } from "../src/deals/deals.service";
 import { FieldsService } from "../src/fields/fields.service";
 import { withDiscardedCrmEvents } from "./agent-trigger.stub";
+import { afterAll, beforeAll, it, TEST_ORG } from "./tenant";
 
 const suffix = process.env.TEST_RUN_ID ?? "currency-totals-spec";
 const userId = `user-${suffix}`;
@@ -90,7 +91,7 @@ beforeAll(async () => {
 	});
 
 	const company = await db.company.upsert({
-		where: { domain },
+		where: { organizationId_domain: { organizationId: TEST_ORG.id, domain } },
 		create: { name: `Money Co ${suffix}`, domain },
 		update: {},
 		select: { id: true },

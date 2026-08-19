@@ -7,7 +7,7 @@ import {
 	removeAgentsNamed,
 	removeEventRuns,
 } from "./e2e-agents";
-import { E2E } from "./e2e-config";
+import { E2E, inE2eOrganization } from "./e2e-config";
 
 const results: Array<{ name: string; ok: boolean; detail: string }> = [];
 
@@ -223,4 +223,4 @@ async function main() {
 	process.exit(failed === 0 ? 0 : 1);
 }
 
-await main();
+await inE2eOrganization(main);

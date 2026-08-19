@@ -1,7 +1,8 @@
 import "@crm/env/load";
 
-import { db } from "@crm/db";
+import { db, tenantIdOrNull } from "@crm/db";
 import { readContextDevKey } from "@crm/db/settings";
+import { platformSetting, resolveOrgSetting } from "./tenant";
 
 export const CONTEXT_DEV = "CONTEXT_DEV";
 
@@ -17,26 +18,46 @@ export type Capability = {
 	readonly from: string;
 };
 
+/**
+ * The Context.dev key for the current organization: what its members entered
+ * in Settings → General, else the override a platform admin set on the
+ * organization, else the platform's own `CONTEXT_DEV_API_KEY`. Outside a
+ * tenant only the platform key applies.
+ */
 export async function contextDevKey(): Promise<string | null> {
-	try {
-		return await readContextDevKey(db);
-	} catch (error) {
-		console.error(
-			`[agent] could not read the Context.dev key from the database: ${
-				error instanceof Error ? error.message : String(error)
-			}`,
-		);
-
-		return null;
+	if (tenantIdOrNull()) {
+		try {
+			const own = await readContextDevKey(db);
+			if (own) return own;
+		} catch (error) {
+			console.error(
+				`[agent] could not read the Context.dev key from the database: ${
+					error instanceof Error ? error.message : String(error)
+				}`,
+			);
+		}
 	}
+
+	return resolveOrgSetting("contextDevApiKey");
 }
 
+/** The Perplexity key: the organization's override, else the platform's `PERPLEXITY_API_KEY`. */
+export function perplexityKey(): Promise<string | null> {
+	return resolveOrgSetting("perplexityApiKey");
+}
+
+/** The organization's capabilities (inside a tenant), or the platform's (outside one). */
 export async function capabilities(): Promise<readonly Capability[]> {
-	return capabilitiesFrom(await contextDevKey());
+	const [contextDev, perplexity] = await Promise.all([
+		contextDevKey(),
+		perplexityKey(),
+	]);
+	return capabilitiesFrom(contextDev, perplexity);
 }
 
 export function capabilitiesFrom(
 	contextDev: string | null,
+	perplexity: string | null = platformSetting("perplexityApiKey"),
 ): readonly Capability[] {
 	const fromEnv = (id: string) => ({
 		id,
@@ -46,7 +67,9 @@ export function capabilitiesFrom(
 
 	return [
 		{
-			...fromEnv("PERPLEXITY_API_KEY"),
+			id: "PERPLEXITY_API_KEY",
+			from: "PERPLEXITY_API_KEY",
+			enabled: perplexity !== null,
 			label: "Web research",
 			gives:
 				"open-web context with citations, and the search that finds a LinkedIn slug in the first place",
@@ -97,10 +120,34 @@ export function unavailable(env: string): UnavailableCapability {
 	};
 }
 
+/**
+ * What the platform itself provides, from the environment alone. Startup has
+ * no organization to read settings for; each organization's own capabilities
+ * are logged when one of its sessions starts (see `logCapabilities`).
+ */
+export function logPlatformCapabilities(): void {
+	const all = capabilitiesFrom(
+		platformSetting("contextDevApiKey"),
+		platformSetting("perplexityApiKey"),
+	);
+	for (const capability of all) {
+		console.log(
+			`[agent] platform ${capability.enabled ? "on " : "off"}  ${capability.label} (${capability.from})`,
+		);
+	}
+}
+
+const loggedOrganizations = new Set<string>();
+
+/** Log the current organization's capabilities once per process. */
 export async function logCapabilities(): Promise<void> {
+	const organizationId = tenantIdOrNull();
+	if (!organizationId || loggedOrganizations.has(organizationId)) return;
+	loggedOrganizations.add(organizationId);
+
 	for (const capability of await capabilities()) {
 		console.log(
-			`[agent] ${capability.enabled ? "on " : "off"}  ${capability.label} (${capability.from})`,
+			`[agent] ${organizationId} ${capability.enabled ? "on " : "off"}  ${capability.label} (${capability.from})`,
 		);
 	}
 }

@@ -139,9 +139,13 @@ export class SsoService {
 
 	constructor(@InjectDatabase() private readonly db: Db) {}
 
+	/**
+	 * What the sign-in page may offer. Runs before any organization is chosen,
+	 * so it lists every registered provider — better-auth routes a sign-in to
+	 * the provider by its id / email domain, not by organization.
+	 */
 	async signInOptions(): Promise<SignInOptions> {
 		const rows = await this.db.ssoProvider.findMany({
-			where: { organizationId: workspaceId() },
 			select: { providerId: true },
 			orderBy: { providerId: "asc" },
 		});

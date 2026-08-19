@@ -1,10 +1,10 @@
-import { defineTool } from "eve/tools";
 import { z } from "zod";
 import type { Evidence, EvidenceKind } from "../lib/evidence";
 import { WEIGHTS } from "../lib/evidence";
 import { writeBrief } from "../lib/facts";
 import { focusOn } from "../lib/focus";
 import { assertResearchPurpose } from "../lib/session-purpose";
+import { defineTool } from "../lib/tenant-tool";
 
 const MAX_NARRATIVE = 400;
 

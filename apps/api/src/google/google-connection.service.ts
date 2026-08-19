@@ -114,9 +114,19 @@ export class GoogleConnectionService {
 		}
 	}
 
+	/**
+	 * Cron, inside one organization's scope. Connections are per (user,
+	 * organization): only people who already connected here are topped up with
+	 * sources they granted since — a membership elsewhere never pulls a mailbox
+	 * into this organization.
+	 */
 	async reconcileAll(): Promise<void> {
+		const connected = await this.state.connectedUserIds(GOOGLE_SYNC_SOURCES);
+		if (connected.length === 0) return;
+
 		const accounts = await this.db.account.findMany({
 			where: {
+				userId: { in: connected },
 				providerId: GOOGLE_PROVIDER_ID,
 				OR: GOOGLE_SYNC_SOURCES.map((source) => ({
 					scope: { contains: SCOPE_FOR_SOURCE[source] },
@@ -125,8 +135,8 @@ export class GoogleConnectionService {
 			select: { userId: true },
 		});
 
-		for (const account of new Set(accounts.map((row) => row.userId))) {
-			await this.onConnected(account);
+		for (const userId of new Set(accounts.map((row) => row.userId))) {
+			await this.onConnected(userId);
 		}
 	}
 

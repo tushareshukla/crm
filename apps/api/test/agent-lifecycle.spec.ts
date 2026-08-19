@@ -1,10 +1,9 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { DEFAULT_WORKSPACE_NAME, workspaceId } from "@crm/auth";
+import { describe, expect } from "bun:test";
 import { db, type Prisma } from "@crm/db";
-import { workspaceSlug } from "@crm/db/workspace";
 import { AgentAccessService } from "../src/agent/agent-access.service";
 import { AgentDefinitionsService } from "../src/agent/agent-definitions.service";
 import { AgentTriggerService } from "../src/agent/agent-trigger.service";
+import { afterAll, beforeAll, it, TEST_ORG } from "./tenant";
 
 const suffix = crypto.randomUUID();
 const userId = `agent-lifecycle-user-${suffix}`;
@@ -21,16 +20,6 @@ const agents = new AgentDefinitionsService(
 );
 
 beforeAll(async () => {
-	await db.organization.upsert({
-		where: { id: workspaceId() },
-		update: {},
-		create: {
-			id: workspaceId(),
-			name: DEFAULT_WORKSPACE_NAME,
-			slug: workspaceSlug(DEFAULT_WORKSPACE_NAME),
-			createdAt: new Date(),
-		},
-	});
 	await db.user.createMany({
 		data: [
 			{
@@ -49,14 +38,14 @@ beforeAll(async () => {
 		data: [
 			{
 				id: memberId,
-				organizationId: workspaceId(),
+				organizationId: TEST_ORG.id,
 				userId,
 				role: "member",
 				createdAt: new Date(),
 			},
 			{
 				id: teammateMemberId,
-				organizationId: workspaceId(),
+				organizationId: TEST_ORG.id,
 				userId: teammateId,
 				role: "member",
 				createdAt: new Date(),

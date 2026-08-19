@@ -90,6 +90,7 @@ describe("collapsing", () => {
 function task(overrides: Partial<LeasedTask> = {}): LeasedTask {
 	return {
 		id: "task_1",
+		organizationId: "org_drain",
 		contactId: "contact_1",
 		companyId: null,
 		dealId: null,
@@ -126,6 +127,21 @@ describe("taskAuth", () => {
 		const auth = taskAuth(task({ contactId: null, companyId: "company_1" }));
 
 		expect(auth.attributes).not.toHaveProperty("contactId");
+	});
+
+	it("names the organization the task belongs to, which is how the session finds its tenant", () => {
+		const auth = taskAuth(task({ organizationId: "org_acme" }));
+
+		expect(auth.attributes).toMatchObject({ organizationId: "org_acme" });
+	});
+
+	it("does not let the base principal's attributes override the task's organization", () => {
+		const auth = taskAuth(task({ organizationId: "org_acme" }), {
+			...APP_AUTH,
+			attributes: { organizationId: "org_someone_else" },
+		});
+
+		expect(auth.attributes).toMatchObject({ organizationId: "org_acme" });
 	});
 
 	it("prefers the principal eve hands the schedule over our own copy", () => {

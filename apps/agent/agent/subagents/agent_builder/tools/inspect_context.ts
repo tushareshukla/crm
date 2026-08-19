@@ -1,7 +1,7 @@
-import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { builderContext } from "../../../lib/builder-runtime";
 import { requireBuilderAttribute } from "../../../lib/session-purpose";
+import { defineTool } from "../../../lib/tenant-tool";
 
 export default defineTool({
 	description:

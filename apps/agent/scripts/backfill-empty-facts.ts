@@ -3,6 +3,7 @@ import { sweepBlankFacts } from "../agent/lib/blank-facts";
 
 const dry = process.argv.includes("--dry");
 
+// Platform backfill: outside any tenant the sweep covers every organization, each inside its own.
 const sweep = await sweepBlankFacts({ dry });
 
 for (const fill of sweep.fills) {

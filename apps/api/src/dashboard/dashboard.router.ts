@@ -3,11 +3,12 @@ import { Ctx, Input, Query, Router, UseMiddlewares } from "nestjs-trpc";
 import type { z } from "zod";
 import type { AuthedTrpcContext } from "../trpc/context.types";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
+import { TenantMiddleware } from "../trpc/middlewares/tenant.middleware";
 import { dashboardSummaryInput } from "./dashboard.contracts";
 import { DashboardService } from "./dashboard.service";
 
 @Router({ alias: "dashboard" })
-@UseMiddlewares(AuthMiddleware)
+@UseMiddlewares(AuthMiddleware, TenantMiddleware)
 export class DashboardRouter {
 	constructor(
 		@Inject(DashboardService) private readonly dashboard: DashboardService,

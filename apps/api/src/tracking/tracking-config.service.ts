@@ -1,4 +1,4 @@
-import type { Db } from "@crm/db";
+import { currentTenantId, type Db, OrgStatus, withoutTenant } from "@crm/db";
 import { settingsId } from "@crm/db/settings";
 import {
 	configHash,
@@ -14,6 +14,11 @@ import { InjectDatabase } from "../database/database.constants";
 const CONFIG_TTL_MS = 5 * 60_000;
 
 const CONFIG_KEY = "tracking:config";
+
+/** Per organization: the compiled config is a tenant value. */
+function configKey(): string {
+	return `${CONFIG_KEY}:${currentTenantId()}`;
+}
 
 export interface CompiledConfig {
 	config: TrackingConfig;
@@ -32,7 +37,8 @@ export class TrackingConfigService {
 	) {}
 
 	async compiled(): Promise<CompiledConfig | null> {
-		const cached = await this.cache.get<CompiledConfig>(CONFIG_KEY);
+		const key = configKey();
+		const cached = await this.cache.get<CompiledConfig>(key);
 		if (cached) return cached;
 
 		const read = this.generation;
@@ -42,7 +48,7 @@ export class TrackingConfigService {
 		const compiled = { config, hash: configHash(config) };
 
 		if (read === this.generation && (await this.current(compiled.hash))) {
-			await this.cache.set(CONFIG_KEY, compiled, CONFIG_TTL_MS);
+			await this.cache.set(key, compiled, CONFIG_TTL_MS);
 		}
 
 		return compiled;
@@ -62,11 +68,33 @@ export class TrackingConfigService {
 		return compiled?.config.siteId === siteId ? compiled : null;
 	}
 
+	/**
+	 * Collector entry point: a site id names exactly one organization. This is
+	 * the platform-level lookup that establishes the tenant for `/api/t/*`;
+	 * a suspended organization's site stops answering.
+	 */
+	async organizationForSite(siteId: string): Promise<string | null> {
+		const row = await withoutTenant(() =>
+			this.db.appSetting.findUnique({
+				where: { trackingSiteId: siteId },
+				select: {
+					organizationId: true,
+					organization: { select: { status: true } },
+				},
+			}),
+		);
+
+		if (!row || row.organization.status !== OrgStatus.ACTIVE) return null;
+
+		return row.organizationId;
+	}
+
 	async invalidate(): Promise<void> {
 		this.generation += 1;
 		const written = this.generation;
+		const key = configKey();
 
-		await this.cache.del(CONFIG_KEY);
+		await this.cache.del(key);
 
 		const config = await readTrackingConfig(this.db);
 
@@ -89,7 +117,7 @@ export class TrackingConfigService {
 		if (written !== this.generation) return;
 		if (!(await this.current(hash))) return;
 
-		await this.cache.set(CONFIG_KEY, { config, hash }, CONFIG_TTL_MS);
+		await this.cache.set(key, { config, hash }, CONFIG_TTL_MS);
 	}
 
 	async ensureSiteId(): Promise<string> {

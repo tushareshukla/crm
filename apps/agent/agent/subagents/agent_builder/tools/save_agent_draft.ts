@@ -1,6 +1,6 @@
-import { defineTool } from "eve/tools";
 import { saveBuilderDraft } from "../../../lib/builder-runtime";
 import { requireBuilderAttribute } from "../../../lib/session-purpose";
+import { defineTool } from "../../../lib/tenant-tool";
 import { builderDraftToolInput, draftInputFromTool } from "../lib/draft-input";
 import {
 	assertBuilderDraftOpen,

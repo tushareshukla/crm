@@ -3,6 +3,7 @@ import { DEFAULT_AGENT_MODEL } from "@crm/db/settings";
 import { defineAgent, defineDynamic } from "eve";
 import { z } from "zod";
 import { attribute, purposeOf } from "../../lib/session-purpose";
+import { inSessionTenant } from "../../lib/tenant";
 
 export default defineAgent({
 	description:
@@ -10,26 +11,27 @@ export default defineAgent({
 	model: defineDynamic({
 		fallback: DEFAULT_AGENT_MODEL.id,
 		events: {
-			"session.started": async (_event, ctx) => {
-				if (purposeOf(ctx) !== "team-agent") return null;
-				const runId = attribute(ctx, "runId");
-				if (!runId) return null;
+			"session.started": (_event, ctx) =>
+				inSessionTenant(ctx, async () => {
+					if (purposeOf(ctx) !== "team-agent") return null;
+					const runId = attribute(ctx, "runId");
+					if (!runId) return null;
 
-				const run = await db.agentRun.findUnique({
-					where: { id: runId },
-					select: {
-						version: {
-							select: { modelId: true, modelContextWindowTokens: true },
+					const run = await db.agentRun.findUnique({
+						where: { id: runId },
+						select: {
+							version: {
+								select: { modelId: true, modelContextWindowTokens: true },
+							},
 						},
-					},
-				});
-				return run
-					? {
-							model: run.version.modelId,
-							modelContextWindowTokens: run.version.modelContextWindowTokens,
-						}
-					: null;
-			},
+					});
+					return run
+						? {
+								model: run.version.modelId,
+								modelContextWindowTokens: run.version.modelContextWindowTokens,
+							}
+						: null;
+				}),
 		},
 	}),
 	outputSchema: z.object({

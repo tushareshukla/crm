@@ -1,5 +1,6 @@
 import {
 	ActivityType,
+	currentTenantId,
 	type Db,
 	type DealStage,
 	type Prisma,
@@ -389,7 +390,7 @@ export class DealsService {
 			>`
 				SELECT id, stage, "companyId"
 				FROM deal
-				WHERE id = ${input.id}
+				WHERE id = ${input.id} AND "organizationId" = ${currentTenantId()}
 				FOR UPDATE
 			`;
 

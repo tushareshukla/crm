@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { describe, expect } from "bun:test";
 import { DealStage, db } from "@crm/db";
 import {
 	companyPreamble,
@@ -10,6 +10,7 @@ import {
 	workspacePreamble,
 } from "../agent/lib/preamble";
 import { identity } from "../agent/lib/workspace";
+import { afterAll, beforeAll, it } from "./support/tenant";
 
 const suffix = process.env.TEST_RUN_ID ?? "preamble-spec";
 const domain = `fernhill-${suffix}.test`;

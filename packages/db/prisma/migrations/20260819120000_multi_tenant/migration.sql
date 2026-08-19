@@ -20,6 +20,9 @@ DROP INDEX "emailThread_rootMessageId_key";
 DROP INDEX "fieldDefinition_entity_key_key";
 
 -- DropIndex
+DROP INDEX "formSubmission_dedupeKey_key";
+
+-- DropIndex
 DROP INDEX "mailboxSync_userId_source_key";
 
 -- DropIndex
@@ -168,13 +171,19 @@ ALTER TABLE "trackedDomain" ADD COLUMN     "organizationId" TEXT NOT NULL DEFAUL
 ALTER TABLE "trackedEvent" ADD COLUMN     "organizationId" TEXT NOT NULL DEFAULT '';
 
 -- AlterTable
-ALTER TABLE "trackedPageDaily" ADD COLUMN     "organizationId" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "trackedPageDaily" DROP CONSTRAINT "trackedPageDaily_pkey",
+ADD COLUMN     "organizationId" TEXT NOT NULL DEFAULT '',
+ADD CONSTRAINT "trackedPageDaily_pkey" PRIMARY KEY ("organizationId", "day", "host", "path");
 
 -- AlterTable
-ALTER TABLE "trackedVisitor" ADD COLUMN     "organizationId" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "trackedVisitor" DROP CONSTRAINT "trackedVisitor_pkey",
+ADD COLUMN     "organizationId" TEXT NOT NULL DEFAULT '',
+ADD CONSTRAINT "trackedVisitor_pkey" PRIMARY KEY ("organizationId", "id");
 
 -- AlterTable
-ALTER TABLE "trackingCounter" ADD COLUMN     "organizationId" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "trackingCounter" DROP CONSTRAINT "trackingCounter_pkey",
+ADD COLUMN     "organizationId" TEXT NOT NULL DEFAULT '',
+ADD CONSTRAINT "trackingCounter_pkey" PRIMARY KEY ("organizationId", "key");
 
 -- AlterTable
 ALTER TABLE "workspaceProfile" ADD COLUMN     "organizationId" TEXT NOT NULL DEFAULT '';
@@ -313,6 +322,9 @@ CREATE INDEX "fieldValue_organizationId_idx" ON "fieldValue"("organizationId");
 CREATE INDEX "formSubmission_organizationId_idx" ON "formSubmission"("organizationId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "formSubmission_organizationId_dedupeKey_key" ON "formSubmission"("organizationId", "dedupeKey");
+
+-- CreateIndex
 CREATE INDEX "mailboxSync_organizationId_idx" ON "mailboxSync"("organizationId");
 
 -- CreateIndex
@@ -338,6 +350,9 @@ CREATE INDEX "slackWorkspaceGrant_organizationId_idx" ON "slackWorkspaceGrant"("
 
 -- CreateIndex
 CREATE UNIQUE INDEX "slackWorkspaceGrant_organizationId_teamId_key" ON "slackWorkspaceGrant"("organizationId", "teamId");
+
+-- CreateIndex
+CREATE INDEX "ssoProvider_organizationId_idx" ON "ssoProvider"("organizationId");
 
 -- CreateIndex
 CREATE INDEX "suppressedContact_organizationId_idx" ON "suppressedContact"("organizationId");
@@ -500,6 +515,9 @@ ALTER TABLE "formSubmission" ADD CONSTRAINT "formSubmission_organizationId_fkey"
 
 -- AddForeignKey
 ALTER TABLE "workspaceProfile" ADD CONSTRAINT "workspaceProfile_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ssoProvider" ADD CONSTRAINT "ssoProvider_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "auditEvent" ADD CONSTRAINT "auditEvent_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;

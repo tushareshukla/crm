@@ -1,10 +1,9 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { DEFAULT_WORKSPACE_NAME, workspaceId } from "@crm/auth";
+import { describe, expect } from "bun:test";
 import { db } from "@crm/db";
-import { workspaceSlug } from "@crm/db/workspace";
 import { z } from "zod";
 import { ConversationSharingService } from "../src/conversations/conversation-sharing.service";
 import { ConversationsService } from "../src/conversations/conversations.service";
+import { afterAll, beforeAll, it, TEST_ORG } from "./tenant";
 
 const record = z.record(z.string(), z.unknown()).catch({});
 
@@ -23,16 +22,6 @@ const service = new ConversationSharingService(db);
 const conversations = new ConversationsService(db);
 
 beforeAll(async () => {
-	await db.organization.upsert({
-		where: { id: workspaceId() },
-		update: {},
-		create: {
-			id: workspaceId(),
-			name: DEFAULT_WORKSPACE_NAME,
-			slug: workspaceSlug(DEFAULT_WORKSPACE_NAME),
-			createdAt: new Date(),
-		},
-	});
 	await db.user.createMany({
 		data: [
 			{ id: userId, name: "Share Owner", email: `${userId}@example.test` },
@@ -52,14 +41,14 @@ beforeAll(async () => {
 		data: [
 			{
 				id: memberId,
-				organizationId: workspaceId(),
+				organizationId: TEST_ORG.id,
 				userId,
 				role: "member",
 				createdAt: new Date(),
 			},
 			{
 				id: viewerMemberId,
-				organizationId: workspaceId(),
+				organizationId: TEST_ORG.id,
 				userId: viewerId,
 				role: "member",
 				createdAt: new Date(),

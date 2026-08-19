@@ -5,7 +5,7 @@ import {
 } from "../../agent/lib/slack-connection";
 import { runSlackChannelJoin } from "../../agent/lib/slack-join-task";
 import { runSlackPeopleMatch } from "../../agent/lib/slack-people";
-import { E2E } from "./e2e-config";
+import { E2E, inE2eOrganization } from "./e2e-config";
 
 const JOINS_FOR_REAL = process.env.E2E_SLACK_JOIN === "1";
 const SKIPPED =
@@ -135,4 +135,4 @@ async function main() {
 	process.exit(failed === 0 ? 0 : 1);
 }
 
-await main();
+await inE2eOrganization(main);

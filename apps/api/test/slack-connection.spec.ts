@@ -1,10 +1,11 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect } from "bun:test";
 import type { WorkspaceRole } from "@crm/auth";
 import type { Db } from "@crm/db";
 import type { AgentAccessService } from "../src/agent/agent-access.service";
 import type { AgentTriggerService } from "../src/agent/agent-trigger.service";
 import type { SlackChannelsService } from "../src/slack/slack-channels.service";
 import { SlackConnectionService } from "../src/slack/slack-connection.service";
+import { it, TEST_ORG } from "./tenant";
 
 const userId = "crm-1";
 
@@ -16,11 +17,11 @@ function serviceFor(input: {
 			id: string;
 			name: string;
 			email: string;
-			slackMemberMatch: {
+			slackMemberMatch: Array<{
 				slackUserId: string | null;
 				slackHandle: string | null;
 				slackEmail: string | null;
-			} | null;
+			}>;
 		};
 	}>;
 	memberCount?: number;
@@ -36,6 +37,7 @@ function serviceFor(input: {
 	const requested: Array<{ reason: string; required: boolean | undefined }> =
 		[];
 	const deleted: string[] = [];
+	const seen: { membersArgs?: unknown } = {};
 	const tx = {
 		account: {
 			deleteMany: async () => {
@@ -75,7 +77,10 @@ function serviceFor(input: {
 		},
 		member: {
 			count: async () => input.memberCount ?? 0,
-			findMany: async () => input.members ?? [],
+			findMany: async (args: unknown) => {
+				seen.membersArgs = args;
+				return input.members ?? [];
+			},
 		},
 		agentTask: {
 			findFirst: async () => input.syncingTask ?? null,
@@ -95,6 +100,7 @@ function serviceFor(input: {
 		service: new SlackConnectionService(db, agent, channels, access),
 		requested,
 		deleted,
+		seen,
 	};
 }
 
@@ -143,18 +149,28 @@ describe("Slack connection", () => {
 	});
 
 	it("returns only real CRM members and their stored exact-email matches", async () => {
-		const { service } = serviceFor({
+		const { service, seen } = serviceFor({
 			members: [
 				{
 					user: {
 						id: "crm-1",
 						name: "Grim",
 						email: "grim@example.test",
-						slackMemberMatch: {
-							slackUserId: "U1",
-							slackHandle: "@grim",
-							slackEmail: "grim@example.test",
-						},
+						slackMemberMatch: [
+							{
+								slackUserId: "U1",
+								slackHandle: "@grim",
+								slackEmail: "grim@example.test",
+							},
+						],
+					},
+				},
+				{
+					user: {
+						id: "crm-2",
+						name: "Unmatched",
+						email: "unmatched@example.test",
+						slackMemberMatch: [],
 					},
 				},
 			],
@@ -177,8 +193,27 @@ describe("Slack connection", () => {
 						slackEmail: "grim@example.test",
 					},
 				},
+				{
+					crmUserId: "crm-2",
+					name: "Unmatched",
+					email: "unmatched@example.test",
+					match: null,
+				},
 			],
 			sync: "syncing",
+		});
+
+		// Members and their matches are this organization's only: a user who is
+		// in several organizations has one match row per organization.
+		expect(seen.membersArgs).toMatchObject({
+			where: { organizationId: TEST_ORG.id },
+			select: {
+				user: {
+					select: {
+						slackMemberMatch: { where: { organizationId: TEST_ORG.id } },
+					},
+				},
+			},
 		});
 	});
 

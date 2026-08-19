@@ -1,4 +1,4 @@
-import { db } from "@crm/db";
+import { db, runWithTenant, withoutTenant } from "@crm/db";
 import { blobEnabled, isMirrored, mirror } from "@crm/db/blob";
 import { COMPANY_IMAGE_FIELDS, type CompanyImageField } from "@crm/db/images";
 import { z } from "zod";
@@ -17,37 +17,41 @@ if (!blobEnabled()) {
 	);
 }
 
-const rows = await db.companyEnrichment.findMany({
-	select: {
-		companyId: true,
-		raw: true,
-		company: {
-			select: {
-				name: true,
-				description: true,
-				logoUrl: true,
-				logoDarkUrl: true,
-				iconUrl: true,
-				iconDarkUrl: true,
-				iconTone: true,
-				brandColor: true,
-				industry: true,
-				subIndustry: true,
-				city: true,
-				stateCode: true,
-				country: true,
-				countryCode: true,
-				phone: true,
-				email: true,
-				linkedinUrl: true,
-				twitterUrl: true,
-				githubUrl: true,
-				pricingUrl: true,
-				careersUrl: true,
+// Platform backfill: every organization's enrichments, each written back inside its own organization.
+const rows = await withoutTenant(() =>
+	db.companyEnrichment.findMany({
+		select: {
+			organizationId: true,
+			companyId: true,
+			raw: true,
+			company: {
+				select: {
+					name: true,
+					description: true,
+					logoUrl: true,
+					logoDarkUrl: true,
+					iconUrl: true,
+					iconDarkUrl: true,
+					iconTone: true,
+					brandColor: true,
+					industry: true,
+					subIndustry: true,
+					city: true,
+					stateCode: true,
+					country: true,
+					countryCode: true,
+					phone: true,
+					email: true,
+					linkedinUrl: true,
+					twitterUrl: true,
+					githubUrl: true,
+					pricingUrl: true,
+					careersUrl: true,
+				},
 			},
 		},
-	},
-});
+	}),
+);
 
 let updated = 0;
 let copied = 0;
@@ -81,7 +85,9 @@ for (const row of rows) {
 
 	if (Object.keys(patch).length === 0) continue;
 
-	await db.company.update({ where: { id: row.companyId }, data: patch });
+	await runWithTenant(row.organizationId, () =>
+		db.company.update({ where: { id: row.companyId }, data: patch }),
+	);
 	updated += 1;
 	console.log(`${row.company.name}: ${Object.keys(patch).join(", ")}`);
 }

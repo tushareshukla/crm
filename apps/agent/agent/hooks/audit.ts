@@ -5,6 +5,7 @@ import { isTransportOnlyEvent } from "../lib/event-persistence";
 import { currentFocus } from "../lib/focus";
 import { lockAgentRun } from "../lib/run-state";
 import { attribute, purposeOf } from "../lib/session-purpose";
+import { inSessionTenant } from "../lib/tenant";
 
 const finiteNumber = z.number().refine(Number.isFinite).nullable().catch(null);
 
@@ -39,29 +40,32 @@ export default defineHook({
 				const purpose = purposeOf(ctx);
 				const conversationId =
 					purpose === "builder" ? attribute(ctx, "conversationId") : null;
-				await db.$transaction(async (tx) => {
-					await tx.agentEvent.createMany({
-						data: [
-							{
-								id,
-								sessionId: ctx.session.id,
-								contactId: currentFocus().contactId,
-								conversationId,
-								type: event.type,
-								data,
-								emittedAt,
-							},
-						],
-						skipDuplicates: true,
-					});
+				// The audit trail belongs to the session's organization.
+				await inSessionTenant(ctx, () =>
+					db.$transaction(async (tx) => {
+						await tx.agentEvent.createMany({
+							data: [
+								{
+									id,
+									sessionId: ctx.session.id,
+									contactId: currentFocus().contactId,
+									conversationId,
+									type: event.type,
+									data,
+									emittedAt,
+								},
+							],
+							skipDuplicates: true,
+						});
 
-					if (purpose === "builder") {
-						await persistBuilderLifecycle(tx, event, ctx.session.id, ctx);
-					}
-					if (purpose === "team-agent") {
-						await persistRunEvent(tx, id, event.type, data, emittedAt, ctx);
-					}
-				});
+						if (purpose === "builder") {
+							await persistBuilderLifecycle(tx, event, ctx.session.id, ctx);
+						}
+						if (purpose === "team-agent") {
+							await persistRunEvent(tx, id, event.type, data, emittedAt, ctx);
+						}
+					}),
+				);
 			} catch (error) {
 				console.warn("[audit] could not record event", {
 					type: event.type,

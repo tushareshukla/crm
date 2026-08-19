@@ -1,5 +1,10 @@
 import { timingSafeEqual } from "node:crypto";
-import { EnrichmentStatus, Prisma } from "@crm/db";
+import {
+	EnrichmentStatus,
+	Prisma,
+	runWithTenant,
+	withoutTenant,
+} from "@crm/db";
 import { MAX_ATTEMPTS } from "@crm/db/agent-tasks";
 import { schemas } from "@crm/validation";
 import { eveTurnFailure } from "@crm/validation/eve-stream";
@@ -33,6 +38,7 @@ import { attribute } from "../lib/session-purpose";
 import { createSlackChannel } from "../lib/slack-membership";
 import { reconcileStaleTasks } from "../lib/stale-tasks";
 import { completeTask, taskSubject } from "../lib/tasks";
+import { inSessionTenant, organizationFromRequest } from "../lib/tenant";
 
 const TASK_MARKER = "task:";
 const STALE_QUEUE_MS = DISPATCH.sweep.staleQueueMs;
@@ -56,8 +62,14 @@ const receiveTarget = z
 		builderSubmissionId: z.string().nullable().catch(null),
 		runId: z.string().nullable().catch(null),
 		taskId: z.string().nullable().catch(null),
+		organizationId: z.string().trim().min(1).nullable().catch(null),
 	})
-	.catch({ builderSubmissionId: null, runId: null, taskId: null });
+	.catch({
+		builderSubmissionId: null,
+		runId: null,
+		taskId: null,
+		organizationId: null,
+	});
 
 function authorised(request: Request): boolean {
 	const secret = process.env.AGENT_BRIDGE_SECRET?.trim();
@@ -110,14 +122,17 @@ export default defineChannel({
 			const health = dispatchHealth();
 			const { db } = await import("@crm/db");
 			const now = new Date();
-			const overdue = await db.agentTask.count({
-				where: {
-					finishedAt: null,
-					dueAt: { lte: new Date(now.getTime() - STALE_QUEUE_MS) },
-					attempts: { lt: MAX_ATTEMPTS },
-					OR: [{ leasedUntil: null }, { leasedUntil: { lt: now } }],
-				},
-			});
+			// Platform health: the backlog across every organization.
+			const overdue = await withoutTenant(() =>
+				db.agentTask.count({
+					where: {
+						finishedAt: null,
+						dueAt: { lte: new Date(now.getTime() - STALE_QUEUE_MS) },
+						attempts: { lt: MAX_ATTEMPTS },
+						OR: [{ leasedUntil: null }, { leasedUntil: { lt: now } }],
+					},
+				}),
+			);
 
 			const wedged = health.stalledMs > DRAIN_TIMEOUT_MS;
 			return Response.json(
@@ -198,9 +213,8 @@ export default defineChannel({
 				return new Response("Unauthorized", { status: 401 });
 			}
 
-			const parsed = schemas.slack.createPayload.safeParse(
-				await request.json().catch(() => null),
-			);
+			const body: unknown = await request.json().catch(() => null);
+			const parsed = schemas.slack.createPayload.safeParse(body);
 
 			if (!parsed.success) {
 				return Response.json(
@@ -209,9 +223,16 @@ export default defineChannel({
 				);
 			}
 
-			const outcome = await createSlackChannel(
-				parsed.data.channelName,
-				parsed.data.isPrivate,
+			const organizationId = await organizationFromRequest(request, body);
+			if (!organizationId) {
+				return Response.json(
+					{ error: "This request names no organization." },
+					{ status: 400 },
+				);
+			}
+
+			const outcome = await runWithTenant(organizationId, () =>
+				createSlackChannel(parsed.data.channelName, parsed.data.isPrivate),
 			);
 
 			return "error" in outcome
@@ -239,175 +260,208 @@ export default defineChannel({
 		}),
 	],
 
+	// Every session event runs inside the organization the session belongs to.
 	events: {
-		async "input.requested"(data, channel, ctx) {
-			await persistBuilderInputRequest(
-				data,
-				channel.continuationToken,
-				attribute(ctx, "conversationId"),
-			);
+		"input.requested"(data, channel, ctx) {
+			return inSessionTenant(ctx, async () => {
+				await persistBuilderInputRequest(
+					data,
+					channel.continuationToken,
+					attribute(ctx, "conversationId"),
+				);
+			});
 		},
 
-		async "message.completed"(data, channel) {
-			const conversationId = builderIdFromToken(channel.continuationToken);
-			if (!conversationId || !data.message?.trim()) return;
+		"message.completed"(data, channel, ctx) {
+			return inSessionTenant(ctx, async () => {
+				const conversationId = builderIdFromToken(channel.continuationToken);
+				if (!conversationId || !data.message?.trim()) return;
 
-			await import("@crm/db").then(({ db }) =>
-				db.agentConversation.updateMany({
-					where: { id: conversationId, kind: "BUILDER" },
-					data: {
-						lastAssistantAt: new Date(),
-						lastMessageAt: new Date(),
-						messageCount: { increment: 1 },
-					},
-				}),
-			);
+				await import("@crm/db").then(({ db }) =>
+					db.agentConversation.updateMany({
+						where: { id: conversationId, kind: "BUILDER" },
+						data: {
+							lastAssistantAt: new Date(),
+							lastMessageAt: new Date(),
+							messageCount: { increment: 1 },
+						},
+					}),
+				);
+			});
 		},
 
-		async "session.waiting"(_data, channel) {
-			if (await closeTask(channel.continuationToken, "ran")) return;
+		"session.waiting"(_data, channel, ctx) {
+			return inSessionTenant(ctx, async () => {
+				if (await closeTask(channel.continuationToken, "ran")) return;
 
-			const conversationId = builderIdFromToken(channel.continuationToken);
-			if (!conversationId) return;
+				const conversationId = builderIdFromToken(channel.continuationToken);
+				if (!conversationId) return;
 
-			await import("@crm/db").then(({ db }) =>
-				db.agentConversation.updateMany({
-					where: { id: conversationId, kind: "BUILDER" },
-					data: { continuationToken: builderToken(conversationId) },
-				}),
-			);
+				await import("@crm/db").then(({ db }) =>
+					db.agentConversation.updateMany({
+						where: { id: conversationId, kind: "BUILDER" },
+						data: { continuationToken: builderToken(conversationId) },
+					}),
+				);
+			});
 		},
 
-		async "turn.failed"(data, channel) {
-			const taskId = taskFromToken(channel.continuationToken);
-			const reason =
-				eveTurnFailure.parse(data).message ?? "The agent turn failed.";
+		"turn.failed"(data, channel, ctx) {
+			return inSessionTenant(ctx, async () => {
+				const taskId = taskFromToken(channel.continuationToken);
+				const reason =
+					eveTurnFailure.parse(data).message ?? "The agent turn failed.";
 
-			if (taskId) {
-				const subject = await taskSubject(taskId);
-				if (subject) await settle(subject, EnrichmentStatus.FAILED, reason);
-				return;
-			}
+				if (taskId) {
+					const subject = await taskSubject(taskId);
+					if (subject) await settle(subject, EnrichmentStatus.FAILED, reason);
+					return;
+				}
 
-			const conversationId = builderIdFromToken(channel.continuationToken);
-			if (conversationId) {
+				const conversationId = builderIdFromToken(channel.continuationToken);
+				if (conversationId) {
+					const { db } = await import("@crm/db");
+					await db.agentConversation.updateMany({
+						where: { id: conversationId, kind: "BUILDER" },
+						data: {
+							continuationToken: builderToken(conversationId),
+							pendingInputRequest: Prisma.DbNull,
+						},
+					});
+					return;
+				}
+
+				const runId = runIdFromToken(channel.continuationToken);
+				if (runId) await failRun(runId, "TURN_FAILED", reason);
+			});
+		},
+
+		"session.completed"(_data, channel, ctx) {
+			return inSessionTenant(ctx, async () => {
+				if (await closeTask(channel.continuationToken, "ran")) return;
+
+				const conversationId = builderIdFromToken(channel.continuationToken);
+				if (conversationId) {
+					const { db } = await import("@crm/db");
+					await db.agentConversation.updateMany({
+						where: { id: conversationId, kind: "BUILDER" },
+						data: { pendingInputRequest: Prisma.DbNull },
+					});
+					return;
+				}
+
+				const runId = runIdFromToken(channel.continuationToken);
+				if (!runId) return;
+
 				const { db } = await import("@crm/db");
-				await db.agentConversation.updateMany({
-					where: { id: conversationId, kind: "BUILDER" },
-					data: {
-						continuationToken: builderToken(conversationId),
-						pendingInputRequest: Prisma.DbNull,
-					},
+				const run = await db.agentRun.findUnique({
+					where: { id: runId },
+					select: { status: true, summary: true, result: true },
 				});
-				return;
-			}
+				if (run?.status !== "RUNNING") return;
 
-			const runId = runIdFromToken(channel.continuationToken);
-			if (runId) await failRun(runId, "TURN_FAILED", reason);
+				try {
+					await finishRun(runId, {
+						summary: run.summary ?? "The agent run completed.",
+						result: runResultOf(run.result),
+					});
+				} catch (error) {
+					await failRun(
+						runId,
+						"NEVER_SETTLED",
+						error instanceof Error ? error.message : String(error),
+					).catch(() => {});
+				}
+			});
 		},
 
-		async "session.completed"(_data, channel) {
-			if (await closeTask(channel.continuationToken, "ran")) return;
+		"turn.cancelled"(_data, channel, ctx) {
+			return inSessionTenant(ctx, async () => {
+				if (
+					await closeTask(
+						channel.continuationToken,
+						"stopped",
+						EnrichmentStatus.SKIPPED,
+					)
+				) {
+					return;
+				}
 
+				const conversationId = builderIdFromToken(channel.continuationToken);
+				if (conversationId) {
+					const { db } = await import("@crm/db");
+					await db.agentConversation.updateMany({
+						where: { id: conversationId, kind: "BUILDER" },
+						data: {
+							continuationToken: builderToken(conversationId),
+							pendingInputRequest: Prisma.DbNull,
+						},
+					});
+					return;
+				}
+
+				const runId = runIdFromToken(channel.continuationToken);
+				if (runId) {
+					await cancelRun(
+						runId,
+						"CANCELLED",
+						"The run was stopped before it finished.",
+					);
+				}
+			});
+		},
+
+		// The one event with no session context: the organization is found from the token instead.
+		async "session.failed"(data, channel) {
 			const conversationId = builderIdFromToken(channel.continuationToken);
 			if (conversationId) {
-				const { db } = await import("@crm/db");
-				await db.agentConversation.updateMany({
-					where: { id: conversationId, kind: "BUILDER" },
-					data: { pendingInputRequest: Prisma.DbNull },
+				const organizationId = await organizationOfConversation(conversationId);
+				if (!organizationId) return;
+				await runWithTenant(organizationId, async () => {
+					const { db } = await import("@crm/db");
+					await db.agentConversation.updateMany({
+						where: { id: conversationId, kind: "BUILDER" },
+						data: {
+							continuationToken: builderToken(conversationId),
+							pendingInputRequest: Prisma.DbNull,
+							lastAssistantAt: new Date(),
+							lastMessageAt: new Date(),
+						},
+					});
 				});
 				return;
 			}
 
 			const runId = runIdFromToken(channel.continuationToken);
 			if (!runId) return;
-
-			const { db } = await import("@crm/db");
-			const run = await db.agentRun.findUnique({
-				where: { id: runId },
-				select: { status: true, summary: true, result: true },
-			});
-			if (run?.status !== "RUNNING") return;
-
-			try {
-				await finishRun(runId, {
-					summary: run.summary ?? "The agent run completed.",
-					result: runResultOf(run.result),
-				});
-			} catch (error) {
-				await failRun(
-					runId,
-					"NEVER_SETTLED",
-					error instanceof Error ? error.message : String(error),
-				).catch(() => {});
-			}
-		},
-
-		async "turn.cancelled"(_data, channel) {
-			if (
-				await closeTask(
-					channel.continuationToken,
-					"stopped",
-					EnrichmentStatus.SKIPPED,
-				)
-			) {
-				return;
-			}
-
-			const conversationId = builderIdFromToken(channel.continuationToken);
-			if (conversationId) {
-				const { db } = await import("@crm/db");
-				await db.agentConversation.updateMany({
-					where: { id: conversationId, kind: "BUILDER" },
-					data: {
-						continuationToken: builderToken(conversationId),
-						pendingInputRequest: Prisma.DbNull,
-					},
-				});
-				return;
-			}
-
-			const runId = runIdFromToken(channel.continuationToken);
-			if (runId) {
-				await cancelRun(
-					runId,
-					"CANCELLED",
-					"The run was stopped before it finished.",
-				);
-			}
-		},
-
-		async "session.failed"(data, channel) {
-			const conversationId = builderIdFromToken(channel.continuationToken);
-			if (conversationId) {
-				const { db } = await import("@crm/db");
-				await db.agentConversation.updateMany({
-					where: { id: conversationId, kind: "BUILDER" },
-					data: {
-						continuationToken: builderToken(conversationId),
-						pendingInputRequest: Prisma.DbNull,
-						lastAssistantAt: new Date(),
-						lastMessageAt: new Date(),
-					},
-				});
-				return;
-			}
-
-			const runId = runIdFromToken(channel.continuationToken);
-			if (runId) await failRun(runId, data.code, data.message);
+			const organizationId = await organizationOfRun(runId);
+			if (!organizationId) return;
+			await runWithTenant(organizationId, () =>
+				failRun(runId, data.code, data.message),
+			);
 		},
 	},
 
+	/**
+	 * Dispatch hands work in here from outside any tenant, naming the
+	 * organization on the target; builder chats and deployed runs are then
+	 * dispatched inside it. A research task's organization travels in its auth.
+	 */
 	async receive(input, { send }) {
 		const target = receiveTarget.parse(input.target);
-		if (target.builderSubmissionId) {
+		const { builderSubmissionId, runId } = target;
+		if (builderSubmissionId) {
 			assertInternalDispatchAuth(input.auth);
-			return dispatchBuilderSubmission(target.builderSubmissionId, send);
+			return runWithTenant(requireTargetOrganization(target), () =>
+				dispatchBuilderSubmission(builderSubmissionId, send),
+			);
 		}
 
-		if (target.runId) {
+		if (runId) {
 			assertInternalDispatchAuth(input.auth);
-			return dispatchAgentRun(target.runId, send);
+			return runWithTenant(requireTargetOrganization(target), () =>
+				dispatchAgentRun(runId, send),
+			);
 		}
 
 		return send(input.message, {
@@ -418,6 +472,40 @@ export default defineChannel({
 		});
 	},
 });
+
+function requireTargetOrganization(target: {
+	organizationId: string | null;
+}): string {
+	if (!target.organizationId) {
+		throw new Error("Internal agent dispatch names no organization.");
+	}
+	return target.organizationId;
+}
+
+/** Platform lookups: which organization a builder chat or a deployed run belongs to, from its id alone. */
+async function organizationOfConversation(
+	conversationId: string,
+): Promise<string | null> {
+	const { db } = await import("@crm/db");
+	const row = await withoutTenant(() =>
+		db.agentConversation.findUnique({
+			where: { id: conversationId },
+			select: { organizationId: true },
+		}),
+	);
+	return row?.organizationId ?? null;
+}
+
+async function organizationOfRun(runId: string): Promise<string | null> {
+	const { db } = await import("@crm/db");
+	const row = await withoutTenant(() =>
+		db.agentRun.findUnique({
+			where: { id: runId },
+			select: { organizationId: true },
+		}),
+	);
+	return row?.organizationId ?? null;
+}
 
 function assertInternalDispatchAuth(auth: InternalDispatchPrincipal): void {
 	if (

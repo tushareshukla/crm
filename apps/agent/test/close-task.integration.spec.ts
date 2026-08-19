@@ -1,6 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { describe, expect } from "bun:test";
 import { db, EnrichmentStatus } from "@crm/db";
 import { closeTask, taskToken } from "../agent/channels/crm";
+import { afterEach, beforeEach, it } from "./support/tenant";
 
 const kind = "test-close-task";
 const email = `close-task-${crypto.randomUUID()}@example.test`;

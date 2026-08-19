@@ -1,6 +1,6 @@
 import { db } from "@crm/db";
 import { reasonOf, removeAgent } from "./e2e-agents";
-import { E2E } from "./e2e-config";
+import { E2E, inE2eOrganization } from "./e2e-config";
 
 const AGENT_URL = process.env.AGENT_URL ?? E2E.liveRun.agentUrl;
 const SECRET = process.env.AGENT_BRIDGE_SECRET?.trim();
@@ -186,4 +186,4 @@ async function main() {
 	process.exit(ok ? 0 : 1);
 }
 
-await main();
+await inE2eOrganization(main);

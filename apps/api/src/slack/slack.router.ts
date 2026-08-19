@@ -10,6 +10,7 @@ import {
 import type { z } from "zod";
 import type { AuthedTrpcContext } from "../trpc/context.types";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
+import { TenantMiddleware } from "../trpc/middlewares/tenant.middleware";
 import {
 	slackChannelsInput,
 	slackCreateChannelInput,
@@ -18,7 +19,7 @@ import {
 import { SlackConnectionService } from "./slack-connection.service";
 
 @Router({ alias: "slack" })
-@UseMiddlewares(AuthMiddleware)
+@UseMiddlewares(AuthMiddleware, TenantMiddleware)
 export class SlackRouter {
 	constructor(
 		@Inject(SlackConnectionService)

@@ -1,10 +1,10 @@
-import { defineTool } from "eve/tools";
 import { z } from "zod";
 import {
 	BUILDER_CONVERSATION_TITLE_MAX_LENGTH,
 	setBuilderConversationTitle,
 } from "../lib/conversation-title";
 import { purposeOf, requireAttribute } from "../lib/session-purpose";
+import { defineTool } from "../lib/tenant-tool";
 
 export default defineTool({
 	description:

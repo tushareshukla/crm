@@ -1,4 +1,3 @@
-import { defineTool } from "eve/tools";
 import { z } from "zod";
 import {
 	CONTEXT_DEV_PEOPLE,
@@ -9,6 +8,7 @@ import {
 import { contactProfileSlug } from "../lib/crm";
 import { spend } from "../lib/focus";
 import { personByProfileUrl } from "../lib/people";
+import { defineTool } from "../lib/tenant-tool";
 
 export default defineTool({
 	description:

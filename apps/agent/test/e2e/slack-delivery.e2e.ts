@@ -1,6 +1,7 @@
 import { db } from "@crm/db";
 import { sendSlackMessage } from "../../agent/lib/run-runtime";
 import { slackAccessToken } from "../../agent/lib/slack-connection";
+import { inE2eOrganization } from "./e2e-config";
 
 type Case = {
 	name: string;
@@ -107,4 +108,4 @@ async function main() {
 	process.exit(failures === 0 ? 0 : 1);
 }
 
-await main();
+await inE2eOrganization(main);

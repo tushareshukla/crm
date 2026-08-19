@@ -1,7 +1,8 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { describe, expect } from "bun:test";
 import { db } from "@crm/db";
 import type { Evidence } from "../agent/lib/evidence";
 import { recordFact, writeBrief } from "../agent/lib/facts";
+import { afterAll, beforeAll, it } from "./support/tenant";
 
 const suffix = process.env.TEST_RUN_ID ?? "facts-spec";
 const email = `evidence.subject.${suffix}@example.test`;

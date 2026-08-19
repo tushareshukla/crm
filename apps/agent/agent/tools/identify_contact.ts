@@ -1,10 +1,10 @@
-import { defineTool } from "eve/tools";
 import { z } from "zod";
 import type { Evidence, EvidenceKind } from "../lib/evidence";
 import { WEIGHTS } from "../lib/evidence";
 import { recordFact } from "../lib/facts";
 import { focusOn } from "../lib/focus";
 import { assertResearchPurpose } from "../lib/session-purpose";
+import { defineTool } from "../lib/tenant-tool";
 
 export default defineTool({
 	description:

@@ -10,6 +10,7 @@ import {
 import type { z } from "zod";
 import type { AuthedTrpcContext } from "../trpc/context.types";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
+import { TenantMiddleware } from "../trpc/middlewares/tenant.middleware";
 import {
 	removeManualRateInput,
 	setManualRateInput,
@@ -18,7 +19,7 @@ import {
 import { CurrencyService } from "./currency.service";
 
 @Router({ alias: "currency" })
-@UseMiddlewares(AuthMiddleware)
+@UseMiddlewares(AuthMiddleware, TenantMiddleware)
 export class CurrencyRouter {
 	constructor(
 		@Inject(CurrencyService) private readonly currency: CurrencyService,

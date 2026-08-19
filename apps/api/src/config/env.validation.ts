@@ -126,6 +126,11 @@ export class EnvironmentVariables {
 	@IsOptional()
 	@IsString()
 	CRM_TELEMETRY_DISABLED?: string;
+
+	/** Comma-separated emails allowed into /admin and into any organization (support mode). */
+	@IsOptional()
+	@IsString()
+	PLATFORM_ADMINS?: string;
 }
 
 export type RawEnvironment = Record<string, string | undefined>;

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { describe, expect } from "bun:test";
 import { db } from "@crm/db";
 import { persistBuilderInputRequest } from "../agent/lib/builder-input";
 import {
@@ -7,6 +7,7 @@ import {
 } from "../agent/lib/builder-runtime";
 import { setBuilderConversationTitle } from "../agent/lib/conversation-title";
 import { builderToken } from "../agent/lib/custom-agent-dispatch";
+import { afterAll, beforeAll, it } from "./support/tenant";
 
 const suffix = crypto.randomUUID();
 const userId = `builder-runtime-user-${suffix}`;

@@ -1,8 +1,12 @@
-import { db } from "@crm/db";
-import { readAgentModel } from "@crm/db/settings";
 import { agentError, modelError } from "@crm/telemetry";
 import { defineHook } from "eve/hooks";
 import { z } from "zod";
+import { resolvedModel } from "../lib/model";
+import {
+	inSessionTenant,
+	sessionOrganizationId,
+	type TenantContext,
+} from "../lib/tenant";
 
 type SessionPrincipal = {
 	readonly attributes?: Readonly<Record<string, string | readonly string[]>>;
@@ -10,18 +14,21 @@ type SessionPrincipal = {
 
 const attributeText = z.string().trim().min(1).nullable().catch(null);
 
-let modelId: string | null = null;
+/** The model each organization runs on, remembered per organization (the platform default when a session names none). */
+const modelIds = new Map<string, string>();
 
-async function configuredModel(): Promise<string | null> {
-	if (modelId) return modelId;
+async function configuredModel(ctx: TenantContext): Promise<string | null> {
+	const organizationId = sessionOrganizationId(ctx) ?? "";
+	const known = modelIds.get(organizationId);
+	if (known) return known;
 
 	try {
-		modelId = (await readAgentModel(db)).id;
+		const id = (await inSessionTenant(ctx, resolvedModel)).id;
+		modelIds.set(organizationId, id);
+		return id;
 	} catch {
-		modelId = null;
+		return null;
 	}
-
-	return modelId;
 }
 
 const MODEL_CODES = [
@@ -73,12 +80,12 @@ export default defineHook({
 			});
 		},
 
-		async "step.failed"(event) {
+		async "step.failed"(event, ctx) {
 			if (!looksLikeModel(event.data.code)) return;
 
 			modelError({
 				error: event.data.code,
-				modelId: await configuredModel(),
+				modelId: await configuredModel(ctx),
 			});
 		},
 	},

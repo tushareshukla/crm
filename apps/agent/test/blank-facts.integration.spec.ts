@@ -1,6 +1,7 @@
-import { afterAll, beforeEach, describe, expect, it } from "bun:test";
+import { describe, expect } from "bun:test";
 import { db, FactBand, FactStatus } from "@crm/db";
 import { sweepBlankFacts } from "../agent/lib/blank-facts";
+import { afterAll, beforeEach, it } from "./support/tenant";
 
 const suffix = process.env.TEST_RUN_ID ?? "blank-facts-spec";
 const email = `blank.subject.${suffix}@example.test`;

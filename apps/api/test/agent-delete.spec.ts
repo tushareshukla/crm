@@ -1,10 +1,9 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { DEFAULT_WORKSPACE_NAME, workspaceId } from "@crm/auth";
+import { describe, expect } from "bun:test";
 import { db } from "@crm/db";
-import { workspaceSlug } from "@crm/db/workspace";
 import { AgentAccessService } from "../src/agent/agent-access.service";
 import { AgentDefinitionsService } from "../src/agent/agent-definitions.service";
 import { AgentTriggerService } from "../src/agent/agent-trigger.service";
+import { afterAll, beforeAll, it, TEST_ORG } from "./tenant";
 
 const suffix = crypto.randomUUID();
 const userId = `agent-delete-user-${suffix}`;
@@ -46,16 +45,6 @@ async function clean() {
 }
 
 beforeAll(async () => {
-	await db.organization.upsert({
-		where: { id: workspaceId() },
-		update: {},
-		create: {
-			id: workspaceId(),
-			name: DEFAULT_WORKSPACE_NAME,
-			slug: workspaceSlug(DEFAULT_WORKSPACE_NAME),
-			createdAt: new Date(),
-		},
-	});
 	await db.user.create({
 		data: {
 			id: userId,
@@ -66,7 +55,7 @@ beforeAll(async () => {
 	await db.member.create({
 		data: {
 			id: memberId,
-			organizationId: workspaceId(),
+			organizationId: TEST_ORG.id,
 			userId,
 			role: "member",
 			createdAt: new Date(),

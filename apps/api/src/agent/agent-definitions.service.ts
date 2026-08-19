@@ -1,4 +1,4 @@
-import type { Db, Prisma, Tx } from "@crm/db";
+import { currentTenantId, type Db, type Prisma, type Tx } from "@crm/db";
 import type { AgentDefinitionStatus } from "@crm/db/enums";
 import { schemas } from "@crm/validation";
 import { readAgentManifestSummary } from "@crm/validation/agent-manifest";
@@ -661,7 +661,7 @@ export class AgentDefinitionsService {
 			>`
 				SELECT id, status
 				FROM "agentDefinition"
-				WHERE id = ${id}
+				WHERE id = ${id} AND "organizationId" = ${currentTenantId()}
 				FOR UPDATE
 			`;
 
@@ -678,6 +678,7 @@ export class AgentDefinitionsService {
 				SELECT id
 				FROM "agentRun"
 				WHERE "agentId" = ${id}
+					AND "organizationId" = ${currentTenantId()}
 					AND (
 						status IN ('QUEUED', 'WAITING_FOR_APPROVAL')
 						OR (status = 'RUNNING' AND "sessionId" IS NULL)
@@ -794,7 +795,7 @@ export class AgentDefinitionsService {
 		>`
 			SELECT id, status, name, description, "currentVersionId"
 			FROM "agentDefinition"
-			WHERE id = ${id}
+			WHERE id = ${id} AND "organizationId" = ${currentTenantId()}
 			FOR UPDATE
 		`;
 

@@ -1479,7 +1479,7 @@ model TrackedVisitor {
   organizationId String       @default("")
   organization   Organization @relation("OrgTrackedVisitor", fields: [organizationId], references: [id], onDelete: Cascade)
 
-  id String @id
+  id String
 
   contactId String?
   contact   Contact? @relation("VisitorContact", fields: [contactId], references: [id], onDelete: SetNull)
@@ -1505,6 +1505,7 @@ model TrackedVisitor {
   firstSeen DateTime @default(now())
   lastSeen  DateTime @updatedAt
 
+  @@id([organizationId, id])
   @@index([contactId])
   @@index([firstSource])
   @@index([organizationId])
@@ -1542,10 +1543,11 @@ model TrackingCounter {
   organizationId String       @default("")
   organization   Organization @relation("OrgTrackingCounter", fields: [organizationId], references: [id], onDelete: Cascade)
 
-  key       String   @id
+  key       String
   value     Int      @default(0)
   expiresAt DateTime
 
+  @@id([organizationId, key])
   @@index([expiresAt])
   @@index([organizationId])
   @@map("trackingCounter")
@@ -1561,7 +1563,7 @@ model TrackedPageDaily {
   views    Int      @default(0)
   visitors Int      @default(0)
 
-  @@id([day, host, path])
+  @@id([organizationId, day, host, path])
   @@index([host, day])
   @@index([organizationId])
   @@map("trackedPageDaily")
@@ -1586,12 +1588,13 @@ model FormSubmission {
   firstTouch Json?
   lastTouch  Json?
 
-  dedupeKey  String    @unique
+  dedupeKey  String
   filedAt    DateTime?
   skipReason String?
 
   createdAt DateTime @default(now())
 
+  @@unique([organizationId, dedupeKey])
   @@index([contactId])
   @@index([createdAt])
   @@index([organizationId])
@@ -1628,15 +1631,16 @@ model TelemetryCounter {
 }
 
 model Organization {
-  id          String       @id
-  name        String
-  slug        String
-  logo        String?
-  createdAt   DateTime
-  metadata    String?
-  website     String?
-  members     Member[]
-  invitations Invitation[]
+  id           String        @id
+  name         String
+  slug         String
+  logo         String?
+  createdAt    DateTime
+  metadata     String?
+  website      String?
+  members      Member[]
+  invitations  Invitation[]
+  ssoProviders SsoProvider[] @relation("OrgSsoProvider")
 
   status      OrgStatus @default(ACTIVE)
   suspendedAt DateTime?
@@ -1747,17 +1751,19 @@ model Invitation {
 }
 
 model SsoProvider {
-  id             String  @id
+  id             String        @id
   issuer         String
   oidcConfig     String?
   samlConfig     String?
   userId         String?
-  user           User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   providerId     String
   organizationId String?
+  organization   Organization? @relation("OrgSsoProvider", fields: [organizationId], references: [id], onDelete: Cascade)
   domain         String
 
   @@unique([providerId])
+  @@index([organizationId])
   @@map("ssoProvider")
 }
 

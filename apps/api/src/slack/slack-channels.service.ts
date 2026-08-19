@@ -4,6 +4,7 @@ import {
 	Logger,
 	ServiceUnavailableException,
 } from "@nestjs/common";
+import { currentTenantId } from "@crm/db";
 import { bridge } from "../agent/bridge";
 import { slackCreateChannelReply } from "./slack.contracts";
 
@@ -32,9 +33,11 @@ export class SlackChannelsService {
 				headers: {
 					authorization: `Bearer ${agent.secret}`,
 					"content-type": "application/json",
+					"x-organization-id": currentTenantId(),
 				},
 				body: JSON.stringify({
 					type: "slack.channel.create",
+					organizationId: currentTenantId(),
 					channelName: name,
 					isPrivate,
 				}),

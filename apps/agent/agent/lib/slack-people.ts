@@ -178,14 +178,21 @@ export async function persistSlackChannels(
 		).values(),
 	];
 
+	const organizationId = currentTenantId();
+
 	return db.$transaction(async (tx) => {
+		// The organization's Slack connection, locked for the length of the rewrite.
 		const [account] = await tx.$queryRaw<Array<{ id: string }>>`
-			SELECT id
-			FROM "account"
-			WHERE "providerId" = 'slack' AND "accessToken" IS NOT NULL
-			ORDER BY "updatedAt" DESC
+			SELECT a.id
+			FROM "account" AS a
+			WHERE a."providerId" = 'slack' AND a."accessToken" IS NOT NULL
+				AND EXISTS (
+					SELECT 1 FROM "member" AS m
+					WHERE m."userId" = a."userId" AND m."organizationId" = ${organizationId}
+				)
+			ORDER BY a."updatedAt" DESC
 			LIMIT 1
-			FOR UPDATE
+			FOR UPDATE OF a
 		`;
 		if (!account) return 0;
 
@@ -196,9 +203,11 @@ export async function persistSlackChannels(
 		});
 		if (ids.length === 0) return 0;
 
+		// Raw SQL: the tenant extension does not see it, so the organization is written by hand,
+		// and a channel row another organization owns (Slack channel ids are global) is left alone.
 		await tx.$executeRaw`
-			INSERT INTO "slackChannel" (id, name, "memberCount", "isPrivate", "isMember", available, "classifiedAt", "createdAt", "updatedAt")
-			SELECT id, name, "memberCount", "isPrivate", "isMember", true, NOW(), NOW(), NOW()
+			INSERT INTO "slackChannel" ("organizationId", id, name, "memberCount", "isPrivate", "isMember", available, "classifiedAt", "createdAt", "updatedAt")
+			SELECT ${organizationId}, id, name, "memberCount", "isPrivate", "isMember", true, NOW(), NOW(), NOW()
 			FROM UNNEST(
 				${ids}::text[],
 				${available.map((channel) => channel.name)}::text[],
@@ -214,6 +223,7 @@ export async function persistSlackChannels(
 				available = true,
 				"classifiedAt" = NOW(),
 				"updatedAt" = NOW()
+			WHERE "slackChannel"."organizationId" = EXCLUDED."organizationId"
 		`;
 
 		return ids.length;

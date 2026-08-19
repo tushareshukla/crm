@@ -1,7 +1,7 @@
-import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { readRunRecord } from "../../../lib/run-runtime";
 import { requireTeamAgentAttribute } from "../../../lib/session-purpose";
+import { defineTool } from "../../../lib/tenant-tool";
 
 export default defineTool({
 	description:

@@ -1,4 +1,4 @@
-import { EnrichmentStatus } from "@crm/db";
+import { EnrichmentStatus, runWithTenant } from "@crm/db";
 import { APP_AUTH, type AppAuth } from "./app-auth";
 import { brandOutcome, runBrand } from "./brand";
 import { queueEventAgentRuns } from "./custom-agent-dispatch";
@@ -17,6 +17,7 @@ import {
 	type LeasedTask,
 	noteSession,
 } from "./tasks";
+import { withOrganization } from "./tenant";
 
 export const VISIBLE_BATCH = DISPATCH.visible.batch;
 export const VISIBLE_CONCURRENCY = DISPATCH.visible.concurrency;
@@ -48,29 +49,32 @@ export async function runVisibleLane(signal?: AbortSignal): Promise<number> {
 
 type DirectOutcome = { finished: true } | { finished: false; reason: string };
 
-export async function runDirect(
+/** Run one direct task inside its own organization: the handler and everything that settles it. */
+export function runDirect(
 	task: LeasedTask,
 	handle: (task: LeasedTask) => Promise<void> = handleDirect,
 	timeoutMs: number = DISPATCH.sweep.itemTimeoutMs,
 ): Promise<void> {
-	const work: Promise<DirectOutcome> = handle(task).then(
-		() => ({ finished: true }) as const,
-		(error) => ({ finished: false, reason: reasonOf(error) }) as const,
-	);
+	return runWithTenant(task.organizationId, async () => {
+		const work: Promise<DirectOutcome> = handle(task).then(
+			() => ({ finished: true }) as const,
+			(error) => ({ finished: false, reason: reasonOf(error) }) as const,
+		);
 
-	const outcome = await settledWithin(work, timeoutMs);
+		const outcome = await settledWithin(work, timeoutMs);
 
-	if (outcome.settled) {
-		await reconcileDirect(task, outcome.value);
-		return;
-	}
+		if (outcome.settled) {
+			await reconcileDirect(task, outcome.value);
+			return;
+		}
 
-	pendingItems += 1;
-	void work
-		.then((late) => reconcileDirect(task, late))
-		.finally(() => {
-			pendingItems -= 1;
-		});
+		pendingItems += 1;
+		void work
+			.then((late) => reconcileDirect(task, late))
+			.finally(() => {
+				pendingItems -= 1;
+			});
+	});
 }
 
 async function reconcileDirect(
@@ -160,37 +164,40 @@ type StartOutcome =
 	| { accepted: true; sessionId: string }
 	| { accepted: false; reason: string };
 
-async function beginResearch(
+/** Start one research session inside the task's organization, and settle the record inside it too. */
+function beginResearch(
 	task: LeasedTask,
 	start: (task: LeasedTask) => Promise<{ id: string }>,
 ): Promise<void> {
-	try {
-		await markRunning(task);
-	} catch (error) {
-		await settle(task, EnrichmentStatus.FAILED, reasonOf(error)).catch(
-			() => {},
+	return runWithTenant(task.organizationId, async () => {
+		try {
+			await markRunning(task);
+		} catch (error) {
+			await settle(task, EnrichmentStatus.FAILED, reasonOf(error)).catch(
+				() => {},
+			);
+			return;
+		}
+
+		const send: Promise<StartOutcome> = start(task).then(
+			(session) => ({ accepted: true, sessionId: session.id }) as const,
+			(error) => ({ accepted: false, reason: reasonOf(error) }) as const,
 		);
-		return;
-	}
 
-	const send: Promise<StartOutcome> = start(task).then(
-		(session) => ({ accepted: true, sessionId: session.id }) as const,
-		(error) => ({ accepted: false, reason: reasonOf(error) }) as const,
-	);
+		const outcome = await settledWithin(send, DISPATCH.sweep.startTimeoutMs);
 
-	const outcome = await settledWithin(send, DISPATCH.sweep.startTimeoutMs);
+		if (outcome.settled) {
+			await reconcileStart(task, outcome.value);
+			return;
+		}
 
-	if (outcome.settled) {
-		await reconcileStart(task, outcome.value);
-		return;
-	}
-
-	pendingStarts += 1;
-	void send
-		.then((late) => reconcileStart(task, late))
-		.finally(() => {
-			pendingStarts -= 1;
-		});
+		pendingStarts += 1;
+		void send
+			.then((late) => reconcileStart(task, late))
+			.finally(() => {
+				pendingStarts -= 1;
+			});
+	});
 }
 
 async function reconcileStart(
@@ -237,21 +244,29 @@ function reasonOf(cause: unknown): string {
 	return cause instanceof Error ? cause.message : String(cause);
 }
 
+/**
+ * The auth a research session is started with. It names the organization the
+ * task belongs to, which is how every tool, hook and event of that session
+ * finds its tenant.
+ */
 export function taskAuth(task: LeasedTask, base: AppAuth = APP_AUTH): AppAuth {
 	const records: Record<string, string> = {};
 	if (task.contactId) records.contactId = task.contactId;
 	if (task.companyId) records.companyId = task.companyId;
 	if (task.dealId) records.dealId = task.dealId;
 
-	return {
-		...base,
-		attributes: {
-			taskKind: task.kind,
-			reason: task.reason,
-			budget: String(task.budget),
-			...records,
+	return withOrganization(
+		{
+			...base,
+			attributes: {
+				taskKind: task.kind,
+				reason: task.reason,
+				budget: String(task.budget),
+				...records,
+			},
 		},
-	};
+		task.organizationId,
+	);
 }
 
 export const DRAIN_TIMEOUT_MS = DISPATCH.sweep.timeoutMs;

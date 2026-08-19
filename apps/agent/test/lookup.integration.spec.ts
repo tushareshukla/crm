@@ -1,6 +1,7 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { describe, expect } from "bun:test";
 import { DealStage, db } from "@crm/db";
 import { listDeals, searchCrm } from "../agent/lib/lookup";
+import { afterAll, beforeAll, it } from "./support/tenant";
 
 const suffix = process.env.TEST_RUN_ID ?? "lookup-spec";
 const domain = `northwind-${suffix}.test`;

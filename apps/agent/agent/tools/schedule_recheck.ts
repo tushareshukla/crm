@@ -1,8 +1,8 @@
 import { PRIORITY } from "@crm/db/agent-tasks";
-import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { assertResearchPurpose } from "../lib/session-purpose";
 import { scheduleTask } from "../lib/tasks";
+import { defineTool } from "../lib/tenant-tool";
 
 const MIN_DAYS = 1;
 const MAX_DAYS = 730;

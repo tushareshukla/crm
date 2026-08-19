@@ -1,6 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { describe, expect } from "bun:test";
 import { db } from "@crm/db";
 import { joinSlackChannel } from "../agent/lib/slack-membership";
+import { afterEach, beforeEach, ensureMember, it } from "./support/tenant";
 
 const USER_ID = "slack-join-spec-user";
 const ACCOUNT_ID = "slack-join-spec-account";
@@ -20,6 +21,8 @@ async function connect() {
 		},
 		update: {},
 	});
+	// The agent only uses a Slack connection that belongs to a member of the organization.
+	await ensureMember(USER_ID);
 	await db.account.upsert({
 		where: { id: ACCOUNT_ID },
 		create: {

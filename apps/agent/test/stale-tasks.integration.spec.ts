@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { describe, expect } from "bun:test";
 import { db, EnrichmentStatus } from "@crm/db";
 import { MAX_ATTEMPTS, RETIRED_OUTCOME } from "@crm/db/agent-tasks";
 import { reconcileStaleTasks } from "../agent/lib/stale-tasks";
+import { afterEach, beforeEach, it } from "./support/tenant";
 
 const kind = "recheck";
 
@@ -294,6 +295,13 @@ describe("running it twice", () => {
 	});
 
 	it("reports a database failure instead of throwing", async () => {
+		await queue({
+			contactId: (await someone(EnrichmentStatus.RUNNING)).id,
+			attempts: 1,
+			startedAt: new Date(Date.now() - 30 * MINUTE_MS),
+			leasedUntil: new Date(Date.now() - MINUTE_MS),
+		});
+
 		const findMany = db.agentTask.findMany;
 		db.agentTask.findMany = () => {
 			throw new Error("the database is unreachable");

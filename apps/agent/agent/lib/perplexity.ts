@@ -1,3 +1,5 @@
+import { perplexityKey } from "./capabilities";
+
 const ENDPOINT = "https://api.perplexity.ai/chat/completions";
 const TIMEOUT_MS = 45_000;
 
@@ -8,8 +10,9 @@ export type Answer = {
 
 type Outcome<T> = { ok: true; data: T } | { ok: false; reason: string };
 
-export function perplexityEnabled(): boolean {
-	return Boolean(process.env.PERPLEXITY_API_KEY);
+/** Whether the current organization (or, outside a tenant, the platform) has a Perplexity key. */
+export async function perplexityEnabled(): Promise<boolean> {
+	return (await perplexityKey()) !== null;
 }
 
 export type AskOptions = {
@@ -22,7 +25,7 @@ export async function ask(
 	question: string,
 	options: AskOptions = {},
 ): Promise<Outcome<Answer>> {
-	const apiKey = process.env.PERPLEXITY_API_KEY;
+	const apiKey = await perplexityKey();
 	if (!apiKey) return { ok: false, reason: "No PERPLEXITY_API_KEY." };
 
 	const controller = new AbortController();

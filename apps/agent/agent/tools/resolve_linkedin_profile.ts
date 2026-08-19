@@ -1,4 +1,3 @@
-import { defineTool } from "eve/tools";
 import { z } from "zod";
 import {
 	CONTEXT_DEV_PEOPLE,
@@ -10,6 +9,7 @@ import { CONTEXT } from "../lib/context-config";
 import { spend } from "../lib/focus";
 import { verdictFor } from "../lib/identity";
 import { personByClues } from "../lib/people";
+import { defineTool } from "../lib/tenant-tool";
 
 export default defineTool({
 	description:

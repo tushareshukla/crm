@@ -10,6 +10,7 @@ import { workspaceId } from "@crm/db/workspace";
 import { AGENT_ACTION_TYPES } from "@crm/validation/agent-manifest";
 import { z } from "zod";
 import { actionDependency } from "./agent-actions";
+import { slackConnected } from "./slack-connection";
 import { requestStaleSlackInventorySync } from "./slack-people";
 
 const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
@@ -628,11 +629,8 @@ async function connectionStatus(userId: string) {
 			where: { userId, providerId: "google" },
 			select: { providerId: true, scope: true },
 		}),
-		db.account.findFirst({
-			where: { providerId: "slack", accessToken: { not: null } },
-			orderBy: { updatedAt: "desc" },
-			select: { id: true },
-		}),
+		// This organization's Slack connection, not any member's anywhere.
+		slackConnected(),
 		db.member.findMany({
 			where: { organizationId: workspaceId() },
 			orderBy: { user: { name: "asc" } },

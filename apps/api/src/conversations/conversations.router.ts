@@ -10,6 +10,7 @@ import {
 import type { z } from "zod";
 import type { AuthedTrpcContext } from "../trpc/context.types";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
+import { TenantMiddleware } from "../trpc/middlewares/tenant.middleware";
 import { ConversationSharingService } from "./conversation-sharing.service";
 import {
 	builderConversationCreateInput,
@@ -26,7 +27,7 @@ import {
 import { ConversationsService } from "./conversations.service";
 
 @Router({ alias: "conversations" })
-@UseMiddlewares(AuthMiddleware)
+@UseMiddlewares(AuthMiddleware, TenantMiddleware)
 export class ConversationsRouter {
 	constructor(
 		@Inject(ConversationsService)

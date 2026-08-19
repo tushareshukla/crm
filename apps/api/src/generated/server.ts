@@ -14,7 +14,10 @@ import { z } from "zod";
 const t = initTRPC.create();
 const publicProcedure = t.procedure;
 import { timelineInput, timelineCountsInput, myTasksInput, activityCreateInput, completeInput } from "../activities/activities.contracts";
+import { createOrganizationInput, updateOrganizationInput, orgIdInput } from "../admin/admin.contracts";
+import { adminAuditLogInput } from "../admin/../audit/audit.contracts";
 import { agentReviseInput, agentIdInput, agentSaveFileInput, agentHistoryInput, agentUpdateInput, agentDeployInput, agentRunNowInput, agentRetryRunInput, agentCancelRunInput } from "../agent/agents.contracts";
+import { auditListInput } from "../audit/audit.contracts";
 import { companyListInput, companyIdInput, companyOptionsInput, companyCreateInput, companyUpdateArgs, companyBulkOwnerInput, companyBulkInput, setPrimaryContactInput } from "../companies/companies.contracts";
 import { contactListInput, contactIdInput, contactCreateInput, contactUpdateArgs, contactBulkOwnerInput, contactBulkCompanyInput, contactBulkInput, factDecisionInput } from "../contacts/contacts.contracts";
 import { conversationListInput, builderResourceSearchInput, conversationIdInput, conversationEventsInput, conversationSaveInput, builderConversationCreateInput, builderConversationSubmitInput, builderQuestionResponseInput, builderResponseRatingInput, sharedConversationInput } from "../conversations/conversations.contracts";
@@ -24,14 +27,18 @@ import { dealListInput, dealIdInput, dealCreateInput, dealUpdateArgs, setStageIn
 import { enrichmentQueueInput } from "@crm/validation/enrichment-queue";
 import { fieldListInput, fieldByKeyInput, fieldIdInput, fieldCreateInput, fieldUpdateArgs, fieldReorderInput } from "../fields/fields.contracts";
 import { setAutoCreateInput, suppressDomainInput, threadInput, calendarEventInput } from "../google/google.contracts";
+import { createInviteInput, inviteIdInput } from "../invites/invites.contracts";
 import { setOutlookAutoCreateInput } from "../microsoft/microsoft.contracts";
+import { orgSlugInput, acceptInvitationInput } from "../orgs/orgs.contracts";
 import { setAgentModelInput, setResearchKeyInput } from "../settings/settings.contracts";
 import { slackChannelsInput, slackJoinChannelInput, slackCreateChannelInput } from "../slack/slack.contracts";
 import { ssoProviderListInput, registerSsoProviderInput, deleteSsoProviderInput } from "../sso/sso.contracts";
 import { trackingFlagInput, cookieLifetimeInput, addDomainInput, removeDomainInput, verifyInput, companyActivityInput, contactActivityInput } from "../tracking/tracking.contracts";
 import { memberListInput, updateWorkspaceInput, setMemberRoleInput } from "../workspace/workspace.contracts";
 import type { ActivitiesRouter } from "../activities/activities.router";
+import type { AdminRouter } from "../admin/admin.router";
 import type { AgentsRouter } from "../agent/agents.router";
+import type { AuditRouter } from "../audit/audit.router";
 import type { CompaniesRouter } from "../companies/companies.router";
 import type { ContactsRouter } from "../contacts/contacts.router";
 import type { ConversationsRouter } from "../conversations/conversations.router";
@@ -41,7 +48,9 @@ import type { DealsRouter } from "../deals/deals.router";
 import type { EnrichmentRouter } from "../enrichment/enrichment.router";
 import type { FieldsRouter } from "../fields/fields.router";
 import type { GoogleRouter } from "../google/google.router";
+import type { InvitesRouter } from "../invites/invites.router";
 import type { MicrosoftRouter } from "../microsoft/microsoft.router";
+import type { OrgsRouter } from "../orgs/orgs.router";
 import type { SearchRouter } from "../search/search.router";
 import type { SettingsRouter } from "../settings/settings.router";
 import type { SlackRouter } from "../slack/slack.router";
@@ -67,6 +76,28 @@ const appRouter = t.router({
     complete: publicProcedure
       .input(completeInput)
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<ActivitiesRouter["complete"]>>)
+    }),
+  admin: t.router({
+    listOrganizations: publicProcedure
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AdminRouter["listOrganizations"]>>),
+    createOrganization: publicProcedure
+      .input(createOrganizationInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AdminRouter["createOrganization"]>>),
+    updateOrganization: publicProcedure
+      .input(updateOrganizationInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AdminRouter["updateOrganization"]>>),
+    suspend: publicProcedure
+      .input(orgIdInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AdminRouter["suspend"]>>),
+    unsuspend: publicProcedure
+      .input(orgIdInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AdminRouter["unsuspend"]>>),
+    deleteOrganization: publicProcedure
+      .input(orgIdInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AdminRouter["deleteOrganization"]>>),
+    auditLog: publicProcedure
+      .input(adminAuditLogInput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AdminRouter["auditLog"]>>)
     }),
   agents: t.router({
     list: publicProcedure
@@ -119,6 +150,11 @@ const appRouter = t.router({
     cancelRun: publicProcedure
       .input(agentCancelRunInput)
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AgentsRouter["cancelRun"]>>)
+    }),
+  audit: t.router({
+    list: publicProcedure
+      .input(auditListInput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AuditRouter["list"]>>)
     }),
   companies: t.router({
     list: publicProcedure
@@ -362,6 +398,16 @@ const appRouter = t.router({
       .input(calendarEventInput)
       .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<GoogleRouter["event"]>>)
     }),
+  invites: t.router({
+    create: publicProcedure
+      .input(createInviteInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<InvitesRouter["create"]>>),
+    list: publicProcedure
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<InvitesRouter["list"]>>),
+    revoke: publicProcedure
+      .input(inviteIdInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<InvitesRouter["revoke"]>>)
+    }),
   microsoft: t.router({
     status: publicProcedure
       .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<MicrosoftRouter["status"]>>),
@@ -374,6 +420,19 @@ const appRouter = t.router({
     setAutoCreate: publicProcedure
       .input(setOutlookAutoCreateInput)
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<MicrosoftRouter["setAutoCreate"]>>)
+    }),
+  orgs: t.router({
+    mine: publicProcedure
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<OrgsRouter["mine"]>>),
+    get: publicProcedure
+      .input(orgSlugInput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<OrgsRouter["get"]>>),
+    switchTo: publicProcedure
+      .input(orgSlugInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<OrgsRouter["switchTo"]>>),
+    acceptInvitation: publicProcedure
+      .input(acceptInvitationInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<OrgsRouter["acceptInvitation"]>>)
     }),
   search: t.router({
     quick: publicProcedure

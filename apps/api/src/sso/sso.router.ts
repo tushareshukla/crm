@@ -11,6 +11,7 @@ import {
 import type { z } from "zod";
 import type { AuthedTrpcContext, BaseTrpcContext } from "../trpc/context.types";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
+import { TenantMiddleware } from "../trpc/middlewares/tenant.middleware";
 import {
 	deleteSsoProviderInput,
 	registerSsoProviderInput,
@@ -26,25 +27,26 @@ function headersOf(ctx: BaseTrpcContext): Headers {
 export class SsoRouter {
 	constructor(@Inject(SsoService) private readonly sso: SsoService) {}
 
+	/** Tenant-free: the sign-in page asks before anyone has an organization. */
 	@Query()
 	async signInOptions() {
 		return this.sso.signInOptions();
 	}
 
 	@Query()
-	@UseMiddlewares(AuthMiddleware)
+	@UseMiddlewares(AuthMiddleware, TenantMiddleware)
 	async settings(@Ctx() ctx: AuthedTrpcContext) {
 		return this.sso.settings(ctx.user.id);
 	}
 
 	@Query({ input: ssoProviderListInput })
-	@UseMiddlewares(AuthMiddleware)
+	@UseMiddlewares(AuthMiddleware, TenantMiddleware)
 	async list(@Input() input: z.infer<typeof ssoProviderListInput>) {
 		return this.sso.list(input);
 	}
 
 	@Mutation({ input: registerSsoProviderInput })
-	@UseMiddlewares(AuthMiddleware)
+	@UseMiddlewares(AuthMiddleware, TenantMiddleware)
 	async register(
 		@Ctx() ctx: AuthedTrpcContext,
 		@Input() input: z.infer<typeof registerSsoProviderInput>,
@@ -53,7 +55,7 @@ export class SsoRouter {
 	}
 
 	@Mutation({ input: deleteSsoProviderInput })
-	@UseMiddlewares(AuthMiddleware)
+	@UseMiddlewares(AuthMiddleware, TenantMiddleware)
 	async remove(
 		@Ctx() ctx: AuthedTrpcContext,
 		@Input() input: z.infer<typeof deleteSsoProviderInput>,

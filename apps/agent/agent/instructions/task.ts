@@ -4,6 +4,7 @@ import { focusOn, setBudget } from "../lib/focus";
 import { sessionPreamble } from "../lib/preamble";
 import { RESEARCH_INSTRUCTIONS } from "../lib/research-instructions";
 import { attribute, purposeOf } from "../lib/session-purpose";
+import { inSessionTenant } from "../lib/tenant";
 
 const attributeText = z.string().trim().min(1).nullable().catch(null);
 
@@ -34,18 +35,21 @@ export default defineDynamic({
 
 			if (budget) setBudget(budget);
 
-			const { markdown, focus } = await sessionPreamble(
-				{
-					contactId: attributeText.parse(attributes.contactId),
-					companyId: attributeText.parse(attributes.companyId),
-					dealId: attributeText.parse(attributes.dealId),
-				},
-				{
-					dispatched: Boolean(kind),
-					kind,
-					reason: attributeText.parse(attributes.reason),
-					budget,
-				},
+			// The preamble reads the record, the workspace and the organization's capabilities: tenant work.
+			const { markdown, focus } = await inSessionTenant(ctx, () =>
+				sessionPreamble(
+					{
+						contactId: attributeText.parse(attributes.contactId),
+						companyId: attributeText.parse(attributes.companyId),
+						dealId: attributeText.parse(attributes.dealId),
+					},
+					{
+						dispatched: Boolean(kind),
+						kind,
+						reason: attributeText.parse(attributes.reason),
+						budget,
+					},
+				),
 			);
 
 			focusOn({ ...focus, sessionId: ctx.session.id });

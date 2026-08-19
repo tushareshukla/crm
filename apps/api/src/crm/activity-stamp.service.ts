@@ -1,4 +1,5 @@
 import {
+	currentTenantId,
 	type Db,
 	type Prisma,
 	Prisma as PrismaNamespace,
@@ -144,52 +145,59 @@ export class ActivityStampService {
 		const record = PrismaNamespace.raw(`"${table}"`);
 		const key = PrismaNamespace.raw(`"${column}"`);
 
+		// Raw SQL bypasses the tenant extension: pin the organization by hand.
+		const org = currentTenantId();
+
 		return this.db.$executeRaw`
 			UPDATE ${record} r
 			SET "lastActivityAt" = (
-				SELECT MAX(a."createdAt") FROM "activity" a WHERE a.${key} = r.id
+				SELECT MAX(a."createdAt") FROM "activity" a
+				WHERE a.${key} = r.id AND a."organizationId" = ${org}
 			)
-			WHERE r.id IN (${PrismaNamespace.join(ids)})`;
+			WHERE r."organizationId" = ${org} AND r.id IN (${PrismaNamespace.join(ids)})`;
 	}
 
+	/** The whole organization — runs inside tenant scope; raw SQL pins the organization by hand. */
 	async recomputeAll(): Promise<void> {
+		const org = currentTenantId();
+
 		await this.db.$transaction([
 			this.db.$executeRaw`
 				UPDATE "company" c
 				SET "lastActivityAt" = a.max
 				FROM (
 					SELECT "companyId" AS id, MAX("createdAt") AS max
-					FROM "activity" WHERE "companyId" IS NOT NULL GROUP BY "companyId"
+					FROM "activity" WHERE "organizationId" = ${org} AND "companyId" IS NOT NULL GROUP BY "companyId"
 				) a
-				WHERE c.id = a.id AND c."lastActivityAt" IS DISTINCT FROM a.max`,
+				WHERE c."organizationId" = ${org} AND c.id = a.id AND c."lastActivityAt" IS DISTINCT FROM a.max`,
 			this.db.$executeRaw`
 				UPDATE "company" SET "lastActivityAt" = NULL
-				WHERE "lastActivityAt" IS NOT NULL
-				AND id NOT IN (SELECT "companyId" FROM "activity" WHERE "companyId" IS NOT NULL)`,
+				WHERE "organizationId" = ${org} AND "lastActivityAt" IS NOT NULL
+				AND id NOT IN (SELECT "companyId" FROM "activity" WHERE "organizationId" = ${org} AND "companyId" IS NOT NULL)`,
 			this.db.$executeRaw`
 				UPDATE "contact" c
 				SET "lastActivityAt" = a.max
 				FROM (
 					SELECT "contactId" AS id, MAX("createdAt") AS max
-					FROM "activity" WHERE "contactId" IS NOT NULL GROUP BY "contactId"
+					FROM "activity" WHERE "organizationId" = ${org} AND "contactId" IS NOT NULL GROUP BY "contactId"
 				) a
-				WHERE c.id = a.id AND c."lastActivityAt" IS DISTINCT FROM a.max`,
+				WHERE c."organizationId" = ${org} AND c.id = a.id AND c."lastActivityAt" IS DISTINCT FROM a.max`,
 			this.db.$executeRaw`
 				UPDATE "contact" SET "lastActivityAt" = NULL
-				WHERE "lastActivityAt" IS NOT NULL
-				AND id NOT IN (SELECT "contactId" FROM "activity" WHERE "contactId" IS NOT NULL)`,
+				WHERE "organizationId" = ${org} AND "lastActivityAt" IS NOT NULL
+				AND id NOT IN (SELECT "contactId" FROM "activity" WHERE "organizationId" = ${org} AND "contactId" IS NOT NULL)`,
 			this.db.$executeRaw`
 				UPDATE "deal" d
 				SET "lastActivityAt" = a.max
 				FROM (
 					SELECT "dealId" AS id, MAX("createdAt") AS max
-					FROM "activity" WHERE "dealId" IS NOT NULL GROUP BY "dealId"
+					FROM "activity" WHERE "organizationId" = ${org} AND "dealId" IS NOT NULL GROUP BY "dealId"
 				) a
-				WHERE d.id = a.id AND d."lastActivityAt" IS DISTINCT FROM a.max`,
+				WHERE d."organizationId" = ${org} AND d.id = a.id AND d."lastActivityAt" IS DISTINCT FROM a.max`,
 			this.db.$executeRaw`
 				UPDATE "deal" SET "lastActivityAt" = NULL
-				WHERE "lastActivityAt" IS NOT NULL
-				AND id NOT IN (SELECT "dealId" FROM "activity" WHERE "dealId" IS NOT NULL)`,
+				WHERE "organizationId" = ${org} AND "lastActivityAt" IS NOT NULL
+				AND id NOT IN (SELECT "dealId" FROM "activity" WHERE "organizationId" = ${org} AND "dealId" IS NOT NULL)`,
 		]);
 	}
 }

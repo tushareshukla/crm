@@ -1,8 +1,9 @@
 import { ActivityType, db } from "@crm/db";
-import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { extract, type JsonSchema } from "../lib/context-dev";
+import { fallbackAuthorId } from "../lib/crm";
 import { spend } from "../lib/focus";
+import { defineTool } from "../lib/tenant-tool";
 
 const RESEARCH_SCHEMA: JsonSchema = {
 	type: "object",
@@ -108,10 +109,7 @@ export default defineTool({
 			return { written: false as const, reason: result.reason };
 		}
 
-		const author =
-			company.ownerId ??
-			(await db.user.findFirst({ select: { id: true } }))?.id ??
-			null;
+		const author = company.ownerId ?? (await fallbackAuthorId());
 
 		if (!author)
 			return { written: false as const, reason: "No user to attribute to." };

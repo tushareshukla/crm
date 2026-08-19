@@ -1,8 +1,8 @@
 import {
 	isWorkspaceAdmin,
 	toWorkspaceRole,
-	workspaceId,
 	type WorkspaceRole,
+	workspaceId,
 	workspaceRoleOf,
 } from "@crm/auth";
 import type { Db, Tx } from "@crm/db";

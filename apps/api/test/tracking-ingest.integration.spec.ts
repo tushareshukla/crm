@@ -1,11 +1,4 @@
-import {
-	afterAll,
-	beforeAll,
-	beforeEach,
-	describe,
-	expect,
-	it,
-} from "bun:test";
+import { describe, expect } from "bun:test";
 import { db } from "@crm/db";
 import { EVENTS_PER_MINUTE, type TrackingConfig } from "@crm/db/tracking";
 import type { TrackingConfigService } from "../src/tracking/tracking-config.service";
@@ -15,6 +8,7 @@ import {
 	type IncomingEvent,
 	TrackingIngestService,
 } from "../src/tracking/tracking-ingest.service";
+import { afterAll, beforeAll, beforeEach, it, TEST_ORG } from "./tenant";
 
 const suffix = process.env.TEST_RUN_ID ?? "ingest-spec";
 const parent = `sites-${suffix}.test`;
@@ -123,7 +117,7 @@ describe("counting page views against a domain", () => {
 		await accept([view(child), view(child), view(parent)]);
 
 		const row = await db.trackedDomain.findUnique({
-			where: { host: parent },
+			where: { organizationId_host: { organizationId: TEST_ORG.id, host: parent } },
 			select: { pageViews: true },
 		});
 
@@ -150,7 +144,7 @@ describe("counting page views against a domain", () => {
 		]);
 
 		const row = await db.trackedDomain.findUnique({
-			where: { host: parent },
+			where: { organizationId_host: { organizationId: TEST_ORG.id, host: parent } },
 			select: { pageViews: true },
 		});
 
