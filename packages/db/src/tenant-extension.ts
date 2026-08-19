@@ -1,6 +1,7 @@
 import { Prisma } from "./generated/prisma/client";
 import {
 	TENANT_COMPOUND_UNIQUES,
+	TENANT_FK_SCALARS,
 	TENANT_LIST_RELATIONS,
 	TENANT_MODELS,
 	TENANT_RELATIONS,
@@ -65,11 +66,30 @@ function compoundWhere(
 	return out;
 }
 
-/** Inject organizationId into a create payload and recurse into nested relation writes. */
-function scopeCreate(model: TenantModel, data: unknown, org: string): unknown {
-	if (Array.isArray(data)) return data.map((d) => scopeCreate(model, d, org));
+/**
+ * Inject the tenant into a create payload and recurse into nested relation writes.
+ * Prisma accepts either the *checked* shape (relation objects, e.g. `company: { create }`)
+ * or the *unchecked* shape (FK scalars, e.g. `companyId`) — never a mix. A payload with
+ * an FK scalar gets `organizationId`; anything else gets `organization: { connect }`,
+ * which is valid in the checked shape and in an all-scalar payload alike.
+ * `createMany` is always unchecked (`scalarsOnly`).
+ */
+function scopeCreate(
+	model: TenantModel,
+	data: unknown,
+	org: string,
+	scalarsOnly = false,
+): unknown {
+	if (Array.isArray(data))
+		return data.map((d) => scopeCreate(model, d, org, scalarsOnly));
 	if (!isObject(data)) return data;
-	const out: AnyRecord = { ...data, organizationId: org };
+	const out: AnyRecord = { ...data };
+	delete out.organizationId;
+	delete out.organization;
+	const unchecked =
+		scalarsOnly || TENANT_FK_SCALARS[model].some((f) => f in out);
+	if (unchecked) out.organizationId = org;
+	else out.organization = { connect: { id: org } };
 	scopeNestedWrites(model, out, org);
 	return out;
 }
@@ -264,7 +284,7 @@ export const tenantScoping = Prisma.defineExtension({
 					return query(a as typeof args);
 				}
 				if (operation === "createMany" || operation === "createManyAndReturn") {
-					a.data = scopeCreate(model, a.data, org);
+					a.data = scopeCreate(model, a.data, org, true);
 					return query(a as typeof args);
 				}
 

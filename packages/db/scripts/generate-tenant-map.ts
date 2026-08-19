@@ -9,12 +9,31 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const schema = readFileSync(join(import.meta.dir, "..", "prisma", "schema.prisma"), "utf8");
+const schema = readFileSync(
+	join(import.meta.dir, "..", "prisma", "schema.prisma"),
+	"utf8",
+);
 
 // better-auth / platform-managed: never auto-scoped (they run outside a tenant context)
-const AUTH_MANAGED = new Set(["Organization", "Member", "Invitation", "SsoProvider", "User", "Session", "Account", "Verification", "RateLimit"]);
+const AUTH_MANAGED = new Set([
+	"Organization",
+	"Member",
+	"Invitation",
+	"SsoProvider",
+	"User",
+	"Session",
+	"Account",
+	"Verification",
+	"RateLimit",
+]);
 
-type Field = { name: string; type: string; list: boolean; relation: boolean };
+type Field = {
+	name: string;
+	type: string;
+	list: boolean;
+	relation: boolean;
+	fkFields: string[];
+};
 type Model = { name: string; fields: Field[]; uniques: string[][] };
 
 const models = new Map<string, Model>();
@@ -26,34 +45,60 @@ for (const [, name, body] of blocks) {
 		const line = raw.trim();
 		if (!line || line.startsWith("//")) continue;
 		const u = line.match(/^@@unique\(\[([^\]]+)\]/);
-		if (u?.[1]) { uniques.push(u[1].split(",").map((s) => s.trim())); continue; }
+		if (u?.[1]) {
+			uniques.push(u[1].split(",").map((s) => s.trim()));
+			continue;
+		}
 		if (line.startsWith("@@")) continue;
 		const m = line.match(/^(\w+)\s+(\w+)(\[\])?(\?)?(\s|$)/);
 		if (!m?.[1] || !m[2]) continue;
-		fields.push({ name: m[1], type: m[2], list: Boolean(m[3]), relation: /@relation\(/.test(line) || Boolean(m[3]) });
+		const fk = line.match(/@relation\([^)]*fields:\s*\[([^\]]+)\]/);
+		fields.push({
+			name: m[1],
+			type: m[2],
+			list: Boolean(m[3]),
+			relation: /@relation\(/.test(line) || Boolean(m[3]),
+			fkFields: fk?.[1] ? fk[1].split(",").map((x) => x.trim()) : [],
+		});
 	}
 	models.set(name, { name, fields, uniques });
 }
 
 const tenantModels = [...models.values()]
-	.filter((m) => m.fields.some((f) => f.name === "organizationId") && !AUTH_MANAGED.has(m.name))
+	.filter(
+		(m) =>
+			m.fields.some((f) => f.name === "organizationId") &&
+			!AUTH_MANAGED.has(m.name),
+	)
 	.map((m) => m.name)
 	.sort();
 const tenantSet = new Set(tenantModels);
 
+// FK scalar fields declared on each tenant model (e.g. Contact.companyId) — their presence in a
+// payload means Prisma's *unchecked* input is in use, where organizationId must be a scalar.
+const fkScalars: Record<string, string[]> = {};
+for (const name of tenantModels) {
+	const m = models.get(name)!;
+	fkScalars[name] = [...new Set(m.fields.flatMap((f) => f.fkFields))].filter(
+		(f) => f !== "organizationId",
+	);
+}
 const relations: Record<string, Record<string, string>> = {};
 // every model (tenant or not): list relations that point at tenant models — include/select on these must be scoped
 const listRelations: Record<string, Record<string, string>> = {};
 for (const m of models.values()) {
 	const rel: Record<string, string> = {};
-	for (const f of m.fields) if (f.list && tenantSet.has(f.type)) rel[f.name] = f.type;
+	for (const f of m.fields)
+		if (f.list && tenantSet.has(f.type)) rel[f.name] = f.type;
 	if (Object.keys(rel).length > 0) listRelations[m.name] = rel;
 }
 const compoundUniques: Record<string, string[][]> = {};
 for (const name of tenantModels) {
 	const m = models.get(name)!;
 	const rel: Record<string, string> = {};
-	for (const f of m.fields) if (tenantSet.has(f.type) && f.name !== "organization") rel[f.name] = f.type;
+	for (const f of m.fields)
+		if (tenantSet.has(f.type) && f.name !== "organization")
+			rel[f.name] = f.type;
 	relations[name] = rel;
 	compoundUniques[name] = m.uniques.filter((u) => u.includes("organizationId"));
 }
@@ -66,8 +111,13 @@ export type TenantModel = (typeof TENANT_MODELS)[number];
 export const TENANT_RELATIONS: Record<TenantModel, Record<string, TenantModel>> = ${JSON.stringify(relations, null, 1)} as never;
 /** list relation field -> tenant model, for EVERY model that has one (include/select scoping). */
 export const TENANT_LIST_RELATIONS: Record<string, Record<string, TenantModel>> = ${JSON.stringify(listRelations, null, 1)} as never;
+/** FK scalar fields per tenant model (presence ⇒ unchecked create input). */
+export const TENANT_FK_SCALARS: Record<TenantModel, readonly string[]> = ${JSON.stringify(fkScalars, null, 1)} as never;
 /** compound unique keys that include organizationId, per tenant model. */
 export const TENANT_COMPOUND_UNIQUES: Record<TenantModel, readonly (readonly string[])[]> = ${JSON.stringify(compoundUniques, null, 1)} as never;
 `;
-writeFileSync(join(import.meta.dir, "..", "src", "tenant-map.generated.ts"), out);
+writeFileSync(
+	join(import.meta.dir, "..", "src", "tenant-map.generated.ts"),
+	out,
+);
 console.log(`tenant map: ${tenantModels.length} models`);

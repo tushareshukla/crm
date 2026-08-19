@@ -2,6 +2,12 @@ import "@crm/env/load";
 
 import { PrismaPg } from "@prisma/adapter-pg";
 import { type Prisma, PrismaClient } from "./generated/prisma/client";
+import {
+	bindScope,
+	captureScope,
+	runInScope,
+	type TenantScope,
+} from "./tenant";
 import { tenantScoping } from "./tenant-extension";
 
 const connectionString =
@@ -119,8 +125,102 @@ const createPrismaClient = () => {
 	});
 
 	// Every query on a tenant model is scoped to the current tenant (see tenant.ts).
-	return client.$extends(tenantScoping);
+	const scoped = client.$extends(tenantScoping);
+	return pinScopes(scoped) as typeof scoped;
 };
+
+type AnyFn = (...args: unknown[]) => unknown;
+
+/**
+ * Prisma queries are lazy and the scoping extension runs when they execute.
+ * Capture the tenant scope when a query is *built* and re-enter it when the
+ * PrismaPromise is settled (`then` / `catch` / `finally`), so a query keeps its
+ * tenant however it is later awaited — returned lazily from a `$transaction`
+ * callback, collected into `Promise.all`, or built inside `runWithTenant` and
+ * awaited outside it. Interactive transaction clients are pinned the same way.
+ */
+function pinScopes<T extends object>(target: T): T {
+	const delegateCache = new WeakMap<object, object>();
+
+	const pinPromise = (promise: unknown, scope: TenantScope): unknown => {
+		if (
+			typeof promise !== "object" ||
+			promise === null ||
+			typeof (promise as { then?: unknown }).then !== "function"
+		)
+			return promise;
+		return new Proxy(promise as object, {
+			get(p, prop, receiver) {
+				const value = Reflect.get(p, prop, receiver);
+				if (prop === "then" || prop === "catch" || prop === "finally") {
+					return (...args: unknown[]) =>
+						runInScope(scope, () => (value as AnyFn).apply(p, args));
+				}
+				// fluent relation accessors (`findUnique(…).company()`) build a new PrismaPromise
+				if (typeof value === "function") {
+					return (...args: unknown[]) =>
+						pinPromise(
+							runInScope(scope, () => (value as AnyFn).apply(p, args)),
+							scope,
+						);
+				}
+				return value;
+			},
+		});
+	};
+
+	const pinDelegate = (delegate: object): object => {
+		const cached = delegateCache.get(delegate);
+		if (cached) return cached;
+		const proxied = new Proxy(delegate, {
+			get(d, prop, receiver) {
+				const value = Reflect.get(d, prop, receiver);
+				if (typeof value !== "function") return value;
+				return (...args: unknown[]) => {
+					const scope = captureScope();
+					return pinPromise(
+						runInScope(scope, () => (value as AnyFn).apply(d, args)),
+						scope,
+					);
+				};
+			},
+		});
+		delegateCache.set(delegate, proxied);
+		return proxied;
+	};
+
+	const isDelegate = (value: unknown): value is object =>
+		typeof value === "object" &&
+		value !== null &&
+		typeof (value as { findMany?: unknown }).findMany === "function";
+
+	return new Proxy(target, {
+		get(t, property, receiver) {
+			const value = Reflect.get(t, property, receiver);
+			if (property === "$transaction") {
+				const run = value as AnyFn;
+				return (arg: unknown, options?: unknown) =>
+					typeof arg === "function"
+						? run.call(
+								t,
+								bindScope((tx: object) =>
+									(arg as (tx: object) => unknown)(pinScopes(tx)),
+								),
+								options,
+							)
+						: run.call(t, arg, options);
+			}
+			if (
+				typeof property === "string" &&
+				!property.startsWith("$") &&
+				isDelegate(value)
+			) {
+				return pinDelegate(value);
+			}
+			return value;
+		},
+	});
+}
 
 declare global {
 	var prisma: ReturnType<typeof createPrismaClient> | undefined;

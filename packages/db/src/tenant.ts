@@ -23,14 +23,63 @@ export class TenantContextMissing extends Error {
 	}
 }
 
+/**
+ * Prisma queries are lazy: `db.x.findMany()` builds a PrismaPromise and the
+ * extension runs when it is awaited. If `fn` returns a thenable we await it
+ * *inside* the scope, so `runWithTenant(id, () => db.x.findMany())` and
+ * `runWithTenant(id, async () => { … })` both stay scoped.
+ */
+function runScoped<T>(store: Store, fn: () => T): T {
+	return storage.run(store, () => {
+		const result = fn();
+		if (isThenable(result)) {
+			return (async () => (await result) as Awaited<T>)() as unknown as T;
+		}
+		return result;
+	});
+}
+
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		typeof (value as { then?: unknown }).then === "function"
+	);
+}
+
+/** Opaque handle to the current scope, for `runInScope`. */
+export type TenantScope = Store | undefined;
+
+export function captureScope(): TenantScope {
+	return storage.getStore();
+}
+
+/** Run `fn` inside a previously captured scope (no-op wrapper when there was none). */
+export function runInScope<T>(scope: TenantScope, fn: () => T): T {
+	return scope ? storage.run(scope, fn) : fn();
+}
+
+/**
+ * Capture the current scope (tenant or bypass) and return a function that runs
+ * `fn` inside it later — used to re-scope Prisma's `$transaction` callback, which
+ * the runtime invokes from its own async chain.
+ */
+export function bindScope<A extends unknown[], R>(
+	fn: (...args: A) => R,
+): (...args: A) => R {
+	const store = storage.getStore();
+	if (!store) return fn;
+	return (...args: A) => runScoped(store, () => fn(...args));
+}
+
 export function runWithTenant<T>(organizationId: string, fn: () => T): T {
 	if (!organizationId) throw new TenantContextMissing();
-	return storage.run({ kind: "tenant", organizationId }, fn);
+	return runScoped({ kind: "tenant", organizationId }, fn);
 }
 
 /** Explicit cross-tenant mode for platform code. Audit every use. */
 export function withoutTenant<T>(fn: () => T): T {
-	return storage.run({ kind: "bypass" }, fn);
+	return runScoped({ kind: "bypass" }, fn);
 }
 
 export function tenantIdOrNull(): string | null {
