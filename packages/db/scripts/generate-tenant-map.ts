@@ -78,7 +78,8 @@ const tenantSet = new Set(tenantModels);
 // payload means Prisma's *unchecked* input is in use, where organizationId must be a scalar.
 const fkScalars: Record<string, string[]> = {};
 for (const name of tenantModels) {
-	const m = models.get(name)!;
+	const m = models.get(name);
+	if (!m) continue;
 	fkScalars[name] = [...new Set(m.fields.flatMap((f) => f.fkFields))].filter(
 		(f) => f !== "organizationId",
 	);
@@ -94,7 +95,8 @@ for (const m of models.values()) {
 }
 const compoundUniques: Record<string, string[][]> = {};
 for (const name of tenantModels) {
-	const m = models.get(name)!;
+	const m = models.get(name);
+	if (!m) continue;
 	const rel: Record<string, string> = {};
 	for (const f of m.fields)
 		if (tenantSet.has(f.type) && f.name !== "organization")

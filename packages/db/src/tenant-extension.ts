@@ -1,5 +1,10 @@
 import { Prisma } from "./generated/prisma/client";
 import {
+	isTenantBypassed,
+	TenantContextMissing,
+	tenantIdOrNull,
+} from "./tenant";
+import {
 	TENANT_COMPOUND_UNIQUES,
 	TENANT_FK_SCALARS,
 	TENANT_LIST_RELATIONS,
@@ -7,11 +12,6 @@ import {
 	TENANT_RELATIONS,
 	type TenantModel,
 } from "./tenant-map.generated";
-import {
-	TenantContextMissing,
-	isTenantBypassed,
-	tenantIdOrNull,
-} from "./tenant";
 
 const TENANT = new Set<string>(TENANT_MODELS);
 const isTenantModel = (model: string): model is TenantModel =>

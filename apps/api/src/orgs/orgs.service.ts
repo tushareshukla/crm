@@ -4,6 +4,12 @@ import {
 	canRenameWorkspace,
 	type WorkspaceRole,
 } from "@crm/auth";
+import {
+	isPlatformAdmin,
+	listUserOrganizations,
+	touchMembership,
+	type UserOrganization,
+} from "@crm/auth/organization";
 import { type Db, type OrgStatus, withoutTenant } from "@crm/db";
 import {
 	HttpException,
@@ -14,12 +20,6 @@ import {
 } from "@nestjs/common";
 import { APIError } from "better-auth/api";
 import { AuditService } from "../audit/audit.service";
-import {
-	isPlatformAdmin,
-	listUserOrganizations,
-	touchMembership,
-	type UserOrganization,
-} from "../auth/platform";
 import { InjectDatabase } from "../database/database.constants";
 import { type OrgLimits, readOrgLimits } from "./org-limits";
 

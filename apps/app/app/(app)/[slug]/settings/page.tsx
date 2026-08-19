@@ -13,6 +13,7 @@ import { requireSession } from "@/lib/session";
 import { HydrateClient } from "@/lib/trpc/hydrate";
 import { getServerQueryClient, getServerTrpc } from "@/lib/trpc/server";
 import { AgentModel } from "./agent-model";
+import { AuditLog } from "./audit-log";
 import { ResearchKey } from "./research-key";
 import { WorkspaceForm } from "./workspace-form";
 
@@ -27,7 +28,8 @@ export default function GeneralSettingsPage() {
 				<PageShellHeading>
 					<PageShellTitle>General</PageShellTitle>
 					<PageShellDescription>
-						Who you are, and the model the research agent thinks with.
+						Who you are, the model the research agent thinks with, and what has
+						been done to this organization.
 					</PageShellDescription>
 				</PageShellHeading>
 			</PageShellHeader>
@@ -60,6 +62,7 @@ async function Settings() {
 				<WorkspaceForm />
 				<ResearchKey />
 				<AgentModel />
+				<AuditLog />
 			</div>
 		</HydrateClient>
 	);

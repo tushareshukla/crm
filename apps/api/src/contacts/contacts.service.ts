@@ -9,6 +9,7 @@ import {
 	type Tx,
 } from "@crm/db";
 import {
+	BadRequestException,
 	ConflictException,
 	Injectable,
 	Logger,
@@ -295,6 +296,20 @@ export class ContactsService {
 						ownerId: input.ownerId,
 					})
 				: null);
+
+		// A company id is only meaningful inside this organization: the tenant
+		// extension scopes the lookup, so a foreign or unknown id reads as missing.
+		if (companyId) {
+			const company = await this.db.company.findUnique({
+				where: { id: companyId },
+				select: { id: true },
+			});
+			if (!company) {
+				throw new BadRequestException(
+					`No company with id ${companyId} in this organization.`,
+				);
+			}
+		}
 
 		const contact = await this.agent.withCrmEvents(async (tx, emit) => {
 			await this.allowAgain(tx, email);

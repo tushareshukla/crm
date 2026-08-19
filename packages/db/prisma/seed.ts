@@ -1,7 +1,5 @@
 import { mirror } from "../src/blob";
 import { db } from "../src/client";
-import { currentTenantId, runWithTenant, withoutTenant } from "../src/tenant";
-import { workspaceSlug } from "../src/workspace";
 import { DEFAULT_REPORTING_CURRENCY } from "../src/currency";
 import { resolveFavicon } from "../src/favicon";
 import {
@@ -10,6 +8,8 @@ import {
 	RateSource,
 } from "../src/generated/prisma/enums";
 import { readReportingCurrency, settingsId } from "../src/settings";
+import { currentTenantId, runWithTenant, withoutTenant } from "../src/tenant";
+import { workspaceSlug } from "../src/workspace";
 
 function makeRandom(seed: number): () => number {
 	let a = seed;
@@ -794,25 +794,29 @@ async function seedOrganization(): Promise<string> {
 			update: {},
 			select: { id: true },
 		});
-		const users = await db.user.findMany({
-			select: { id: true },
-			orderBy: [{ createdAt: "asc" }],
-		});
-		if (users.length > 0) {
-			await db.member.createMany({
-				data: users.map((user, index) => ({
-					id: crypto.randomUUID(),
-					organizationId: org.id,
-					userId: user.id,
-					role: index === 0 ? "owner" : "member",
-					createdAt: new Date(),
-				})),
-				skipDuplicates: true,
-			});
-		}
 		console.log(`Seeding into organization "${slug}" (${org.id}).`);
 		return org.id;
 	});
+}
+
+/** Every user becomes a member of the seed org (first one owner) so somebody can open it. */
+async function enrolUsers(organizationId: string): Promise<number> {
+	const users = await db.user.findMany({
+		select: { id: true },
+		orderBy: [{ createdAt: "asc" }],
+	});
+	if (users.length === 0) return 0;
+	await db.member.createMany({
+		data: users.map((user, index) => ({
+			id: crypto.randomUUID(),
+			organizationId,
+			userId: user.id,
+			role: index === 0 ? "owner" : "member",
+			createdAt: new Date(),
+		})),
+		skipDuplicates: true,
+	});
+	return users.length;
 }
 
 async function main() {
@@ -823,6 +827,7 @@ async function main() {
 async function seedTenant() {
 	const rates = await seedRates();
 	const ownerIds = await seedOwners();
+	await enrolUsers(currentTenantId());
 	const companies = await seedCompanies(ownerIds);
 	const contacts = await seedContacts(companies, ownerIds);
 	const deals = await seedDeals(companies, contacts, ownerIds);

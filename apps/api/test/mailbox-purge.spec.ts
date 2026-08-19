@@ -191,7 +191,10 @@ async function messagesOn(rootMessageId: string): Promise<string[]> {
 async function threadState(rootMessageId: string) {
 	return db.emailThread.findUnique({
 		where: {
-			organizationId_rootMessageId: { organizationId: TEST_ORG.id, rootMessageId },
+			organizationId_rootMessageId: {
+				organizationId: TEST_ORG.id,
+				rootMessageId,
+			},
 		},
 		select: {
 			subject: true,

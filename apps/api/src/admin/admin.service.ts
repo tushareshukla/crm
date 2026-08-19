@@ -328,6 +328,12 @@ function toAdminOrganization(row: OrgRow): AdminOrganization {
 	};
 }
 
+/**
+ * The app's own top-level routes sit beside `/[slug]`, so an organization can
+ * never take one of their names (see apps/app/lib/org-slug.ts RESERVED_ROUTES).
+ * `RESERVED_SLUGS` covers the section routes; these are the rest.
+ */
+
 /** Same rules the workspace slug helper applies, plus "it must not need rewriting". */
 function validSlug(slug: string): string {
 	if (RESERVED_SLUGS.includes(slug)) {

@@ -17,9 +17,9 @@ export {
 	isWorkspaceAdmin,
 	isWorkspaceRole,
 	toWorkspaceRole,
-	workspaceId,
 	WORKSPACE_ROLES,
 	type WorkspaceRole,
+	workspaceId,
 	workspaceRoleOf,
 } from "./organization";
 export {

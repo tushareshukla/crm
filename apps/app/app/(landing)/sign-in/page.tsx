@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { Suspense } from "react";
 import { AuthHeading, AuthShell } from "@/components/auth-shell";
+import { safeNextPath } from "@/lib/home";
 import { getSession } from "@/lib/session";
 import { getServerQueryClient, getServerTrpc } from "@/lib/trpc/server";
 import { PasswordSignIn } from "./password-sign-in";
@@ -61,14 +62,18 @@ export default function SignInPage({ searchParams }: PageProps<"/sign-in">) {
 async function SignIn({
 	searchParams,
 }: Pick<PageProps<"/sign-in">, "searchParams">) {
-	const [session, options, { method }] = await Promise.all([
+	const [session, options, { method, next }] = await Promise.all([
 		currentSession(),
 		signInOptions(),
 		searchParams,
 	]);
 
+	// Where to land afterwards: an invitation link that sent them here, or the
+	// home page, which works out their organization.
+	const target = safeNextPath(first(next)) ?? "/";
+
 	if (session) {
-		redirect("/");
+		redirect(target);
 	}
 
 	const configured: MailboxProviderId[] = [];
@@ -77,7 +82,7 @@ async function SignIn({
 
 	const providers = options?.providers ?? [];
 
-	const insisted = configured.find((provider) => provider === method);
+	const insisted = configured.find((provider) => provider === first(method));
 	const showSso = providers.length > 0 && insisted === undefined;
 	const social =
 		insisted !== undefined
@@ -93,14 +98,18 @@ async function SignIn({
 				description="Sign in with your account to continue."
 			/>
 
-			<PasswordSignIn />
+			<PasswordSignIn next={target} />
 			{showSso || social.length > 0 ? (
 				<p className="text-center text-muted-foreground text-xs">or</p>
 			) : null}
-			{showSso ? <SsoSignIn providers={providers} /> : null}
+			{showSso ? <SsoSignIn providers={providers} next={target} /> : null}
 			{social.map((provider) => (
-				<SocialSignIn key={provider} provider={provider} />
+				<SocialSignIn key={provider} provider={provider} next={target} />
 			))}
 		</>
 	);
+}
+
+function first(value: string | string[] | undefined): string | undefined {
+	return Array.isArray(value) ? value[0] : value;
 }

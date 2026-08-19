@@ -1,4 +1,3 @@
-import type { Prisma } from "./generated/prisma/client";
 import type { Tx } from "@crm/db";
 
 export async function lockIdempotencyKey(tx: Tx, key: string): Promise<void> {

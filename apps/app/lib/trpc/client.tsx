@@ -8,10 +8,9 @@ import {
 	type TRPCOptionsProxy,
 } from "@trpc/tanstack-react-query";
 import type { AppRouter } from "api/app-router";
-import { useParams } from "next/navigation";
 import type { FC, ReactNode } from "react";
 import { useState } from "react";
-import { orgSlugFromPathname, orgSlugHeaders } from "@/lib/org-slug";
+import { orgSlugHeaders } from "@/lib/org-slug";
 import { getQueryClient } from "./query-client";
 
 const { TRPCProvider: ContextProvider, useTRPC: useTRPCContext } =
@@ -26,35 +25,68 @@ const TRPCProvider: FC<{
 
 export const useTRPC: () => TRPCOptionsProxy<AppRouter> = useTRPCContext;
 
-export function TRPCReactProvider({ children }: { children: ReactNode }) {
-	// The organization is whatever the URL says it is, so the cache follows
-	// the `[slug]` segment: a fresh one per organization, one shared cache for
-	// the app's own routes.
-	const params = useParams<{ slug?: string }>();
-	const scope = orgSlugFromPathname(`/${params?.slug ?? ""}`) ?? "";
-	const queryClient = getQueryClient(scope);
+function makeTrpcClient(): TRPCClient<AppRouter> {
+	return createTRPCClient<AppRouter>({
+		links: [
+			httpBatchLink({
+				url: "/api/trpc",
+				// Read at request time rather than once: the same client serves
+				// every organization the rep moves between, and every call names
+				// the organization of the page it is made from.
+				headers: () => orgSlugHeaders(window.location.pathname),
+			}),
+		],
+	});
+}
 
-	const [trpcClient] = useState(() =>
-		createTRPCClient<AppRouter>({
-			links: [
-				httpBatchLink({
-					url: "/api/trpc",
-					// Read at request time rather than once: the same client serves
-					// every organization the rep moves between.
-					headers: () => orgSlugHeaders(window.location.pathname),
-				}),
-			],
-		}),
-	);
+function Providers({
+	scope,
+	children,
+}: {
+	scope: string;
+	children: ReactNode;
+}) {
+	const queryClient = getQueryClient(scope);
+	const [trpcClient] = useState(makeTrpcClient);
 
 	return (
 		<QueryClientProvider client={queryClient}>
 			<TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
 				{children}
-				{process.env.NODE_ENV === "development" ? (
-					<ReactQueryDevtools initialIsOpen={false} />
-				) : null}
 			</TRPCProvider>
 		</QueryClientProvider>
 	);
+}
+
+/**
+ * The app-wide providers: the cache the app's own routes (sign-in, admin,
+ * welcome…) share. Organization pages sit inside an `OrgQueryScope` below,
+ * which gives each organization a cache of its own.
+ */
+export function TRPCReactProvider({ children }: { children: ReactNode }) {
+	return (
+		<Providers scope="">
+			{children}
+			{process.env.NODE_ENV === "development" ? (
+				<ReactQueryDevtools initialIsOpen={false} />
+			) : null}
+		</Providers>
+	);
+}
+
+/**
+ * One cache per organization. Query keys are procedure + input and carry no
+ * organization, so a shared cache would hand `/acme`'s contacts to `/globex`
+ * for a moment after switching. The `[slug]` layouts render this with the
+ * slug they resolved, so everything under them reads and writes that
+ * organization's cache and nothing else's.
+ */
+export function OrgQueryScope({
+	slug,
+	children,
+}: {
+	slug: string;
+	children: ReactNode;
+}) {
+	return <Providers scope={slug}>{children}</Providers>;
 }

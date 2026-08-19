@@ -27,10 +27,13 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { toast } from "sonner";
+import { slugDraft, slugify } from "@/lib/slugify";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import { useWorkspaceSlug } from "@/lib/use-workspace-url";
 import { workspaceUrl } from "@/lib/workspace-url";
+
+type Draft = { name: string; slug: string; website: string };
 
 export function WorkspaceForm() {
 	const trpc = useTRPC();
@@ -39,24 +42,29 @@ export function WorkspaceForm() {
 	const slug = useWorkspaceSlug();
 
 	const nameId = useId();
+	const slugId = useId();
 	const websiteId = useId();
 
 	const workspace = useQuery(trpc.workspace.get.queryOptions());
 
-	const [draft, setDraft] = useState<{ name: string; website: string } | null>(
-		null,
-	);
+	const [draft, setDraft] = useState<Draft | null>(null);
 
 	const save = useMutation(
 		trpc.workspace.update.mutationOptions({
 			onSuccess: async (saved) => {
+				if (saved.slug !== slug) {
+					// The address is the tenant: every call from the new URL names
+					// the organization by its new slug, so a full navigation starts
+					// it from a clean cache.
+					window.location.assign(workspaceUrl(saved.slug, "/settings"));
+					return;
+				}
+
 				await cache.workspace();
 				setDraft(null);
-				toast.success("Workspace saved.");
-
-				if (saved.slug !== slug) {
-					router.replace(workspaceUrl(saved.slug, "/settings"));
-				}
+				toast.success("Organization saved.");
+				// The header shows the name from the server; let it catch up.
+				router.refresh();
 			},
 			onError: (error) => toast.error(error.message),
 		}),
@@ -65,19 +73,26 @@ export function WorkspaceForm() {
 	if (!workspace.data) return null;
 
 	const { name, website, canRename } = workspace.data;
+	const current: Draft = {
+		name,
+		slug: workspace.data.slug,
+		website: website ?? "",
+	};
 
-	const values = draft ?? { name, website: website ?? "" };
-	const dirty = values.name !== name || values.website !== (website ?? "");
+	const values = draft ?? current;
+	const dirty =
+		values.name !== current.name ||
+		values.slug !== current.slug ||
+		values.website !== current.website;
 
-	const edit = (patch: Partial<typeof values>) =>
-		setDraft({ ...values, ...patch });
+	const edit = (patch: Partial<Draft>) => setDraft({ ...values, ...patch });
 
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>Workspace</CardTitle>
+				<CardTitle>Organization</CardTitle>
 				<CardDescription>
-					The name and website of the company using this CRM.
+					The name, address and website of the company using this CRM.
 				</CardDescription>
 
 				<CardAction>
@@ -89,6 +104,7 @@ export function WorkspaceForm() {
 							save.isPending ||
 							!dirty ||
 							values.name.trim() === "" ||
+							slugify(values.slug) === "" ||
 							values.website.trim() === ""
 						}
 					>
@@ -105,6 +121,7 @@ export function WorkspaceForm() {
 						event.preventDefault();
 						save.mutate({
 							name: values.name,
+							slug: slugify(values.slug),
 							website: values.website.trim(),
 						});
 					}}
@@ -123,6 +140,34 @@ export function WorkspaceForm() {
 							/>
 							<FieldDescription>
 								Shown wherever the CRM refers to your own company.
+							</FieldDescription>
+						</Field>
+
+						<Field>
+							<FieldLabel htmlFor={slugId}>Address</FieldLabel>
+							<InputGroup>
+								<InputGroupAddon>
+									<InputGroupText>/</InputGroupText>
+								</InputGroupAddon>
+								<InputGroupInput
+									id={slugId}
+									value={values.slug}
+									onChange={(event) =>
+										edit({ slug: slugDraft(event.target.value) })
+									}
+									onBlur={() => edit({ slug: slugify(values.slug) })}
+									placeholder="acme"
+									autoComplete="off"
+									autoCapitalize="off"
+									autoCorrect="off"
+									spellCheck={false}
+									disabled={!canRename || save.isPending}
+									required
+								/>
+							</InputGroup>
+							<FieldDescription>
+								Your team opens the CRM at this address. Changing it moves
+								everyone to the new one — old links stop working.
 							</FieldDescription>
 						</Field>
 

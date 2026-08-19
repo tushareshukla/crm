@@ -1,4 +1,4 @@
-import { type Db, db, withoutTenant } from "@crm/db";
+import { type Db, db } from "@crm/db";
 import { workspaceId } from "@crm/db/workspace";
 
 export { workspaceId };

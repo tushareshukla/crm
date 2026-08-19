@@ -1,22 +1,35 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { SlackChannelsService } from "../src/slack/slack-channels.service";
+import { inTenant, TEST_ORG } from "./tenant";
 
-const service = new SlackChannelsService();
+/** The service names the organization on every call, so it runs in tenant scope. */
+const service = {
+	create: (name: string, isPrivate: boolean) =>
+		inTenant(TEST_ORG.id, () =>
+			new SlackChannelsService().create(name, isPrivate),
+		),
+};
 const realFetch = globalThis.fetch;
 const realSecret = process.env.AGENT_BRIDGE_SECRET;
 
+let lastRequest: { url: string; init?: RequestInit } | null = null;
+
 function agentAnswers(status: number, body: string | null) {
 	globalThis.fetch = (async (
-		_url: string | URL | Request,
-		_init?: RequestInit,
-	) =>
-		new Response(body, {
+		url: string | URL | Request,
+		init?: RequestInit,
+	) => {
+		lastRequest = { url: String(url), init };
+
+		return new Response(body, {
 			status,
 			headers: { "content-type": "application/json" },
-		})) as typeof fetch;
+		});
+	}) as typeof fetch;
 }
 
 beforeEach(() => {
+	lastRequest = null;
 	process.env.AGENT_BRIDGE_SECRET = "slack-channel-test";
 });
 
@@ -35,6 +48,19 @@ describe("creating a Slack channel", () => {
 
 		expect(await service.create("deals", false)).toEqual({
 			channel: { id: "C1", name: "deals" },
+		});
+	});
+
+	it("names the organization on the call to the agent", async () => {
+		agentAnswers(200, JSON.stringify({ channel: { id: "C1", name: "deals" } }));
+
+		await service.create("deals", false);
+
+		const headers = new Headers(lastRequest?.init?.headers);
+		expect(headers.get("x-organization-id")).toBe(TEST_ORG.id);
+		expect(JSON.parse(String(lastRequest?.init?.body))).toMatchObject({
+			organizationId: TEST_ORG.id,
+			channelName: "deals",
 		});
 	});
 

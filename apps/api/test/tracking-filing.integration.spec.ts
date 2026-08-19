@@ -43,6 +43,14 @@ const byEmail = (email: string) => ({
 	organizationId_email: { organizationId: TEST_ORG.id, email },
 });
 
+/** Counters are keyed by (organization, key). */
+const byKey = (key: string) => ({
+	organizationId_key: {
+		organizationId: TEST_ORG.id,
+		key: scopedCounterKey(key),
+	},
+});
+
 async function submit(email: string | null, name: string | null = "Dana Reed") {
 	const row = await db.formSubmission.create({
 		data: {
@@ -253,7 +261,7 @@ describe("filing a form submission", () => {
 		expect(await db.contact.count({ where: { email } })).toBe(1);
 
 		const counter = await db.trackingCounter.findUnique({
-			where: { key: scopedCounterKey(contactWindowKey()) },
+			where: byKey(contactWindowKey()),
 			select: { value: true },
 		});
 
@@ -278,7 +286,7 @@ describe("filing a form submission", () => {
 
 	it("stores but does not file once the hourly cap is reached", async () => {
 		await db.trackingCounter.upsert({
-			where: { key: scopedCounterKey(contactWindowKey()) },
+			where: byKey(contactWindowKey()),
 			create: {
 				key: scopedCounterKey(contactWindowKey()),
 				value: CONTACTS_PER_HOUR,
@@ -314,12 +322,12 @@ describe("the hourly counter", () => {
 
 		await counters.take(key, 10);
 		const first = await db.trackingCounter.findUnique({
-			where: { key: scopedCounterKey(key) },
+			where: byKey(key),
 		});
 
 		await counters.take(key, 10);
 		const second = await db.trackingCounter.findUnique({
-			where: { key: scopedCounterKey(key) },
+			where: byKey(key),
 		});
 
 		expect(second?.expiresAt.getTime()).toBe(first?.expiresAt.getTime() ?? 0);

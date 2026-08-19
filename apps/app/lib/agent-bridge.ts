@@ -15,6 +15,8 @@ type BridgeClaims = {
 	sub: string;
 	email: string;
 	name: string;
+	/** The organization the rep is working in; the agent scopes the whole session to it. */
+	organizationId: string;
 	contactId?: string;
 	companyId?: string;
 	dealId?: string;
@@ -23,16 +25,29 @@ type BridgeClaims = {
 	exp: number;
 };
 
+export type BridgeScope = {
+	/** Required: a token that names no organization would run the agent unscoped. */
+	organizationId: string;
+	contactId?: string;
+	companyId?: string;
+	dealId?: string;
+};
+
 export async function mintBridgeToken(
 	user: {
 		id: string;
 		email: string;
 		name: string;
 	},
-	record: { contactId?: string; companyId?: string; dealId?: string } = {},
+	scope: BridgeScope,
 ): Promise<string> {
 	const secret = process.env.AGENT_BRIDGE_SECRET;
 	if (!secret) throw new Error("AGENT_BRIDGE_SECRET is not set.");
+
+	const organizationId = scope.organizationId?.trim();
+	if (!organizationId) {
+		throw new Error("A bridge token must name the organization it is for.");
+	}
 
 	const now = Math.floor(Date.now() / 1000);
 
@@ -43,14 +58,15 @@ export async function mintBridgeToken(
 		sub: user.id,
 		email: user.email,
 		name: user.name,
+		organizationId,
 		iat: now,
 		nbf: now - 5,
 		exp: now + TTL_SECONDS,
 	};
 
-	if (record.contactId) payload.contactId = record.contactId;
-	if (record.companyId) payload.companyId = record.companyId;
-	if (record.dealId) payload.dealId = record.dealId;
+	if (scope.contactId) payload.contactId = scope.contactId;
+	if (scope.companyId) payload.companyId = scope.companyId;
+	if (scope.dealId) payload.dealId = scope.dealId;
 
 	const signingInput = `${base64url(encode(JSON.stringify(header)))}.${base64url(
 		encode(JSON.stringify(payload)),

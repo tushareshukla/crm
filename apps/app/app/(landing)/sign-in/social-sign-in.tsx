@@ -9,6 +9,7 @@ import { Spinner } from "@crm/ui/components/spinner";
 import type { FC, SVGProps } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { signInPath } from "@/lib/home";
 
 type ProviderChoice = {
 	label: string;
@@ -20,7 +21,14 @@ const PROVIDERS = {
 	microsoft: { label: "Continue with Microsoft", Logo: MicrosoftLogo },
 } as const satisfies Record<MailboxProviderId, ProviderChoice>;
 
-export function SocialSignIn({ provider }: { provider: MailboxProviderId }) {
+export function SocialSignIn({
+	provider,
+	next = "/",
+}: {
+	provider: MailboxProviderId;
+	/** Where to land once signed in; the sign-in page keeps it safe. */
+	next?: string;
+}) {
 	const [pending, setPending] = useState(false);
 
 	const { label, Logo } = PROVIDERS[provider];
@@ -37,8 +45,8 @@ export function SocialSignIn({ provider }: { provider: MailboxProviderId }) {
 
 		const { error } = await signIn.social({
 			provider,
-			callbackURL: `${origin}/`,
-			errorCallbackURL: `${origin}/sign-in`,
+			callbackURL: `${origin}${next}`,
+			errorCallbackURL: `${origin}${signInPath(next)}`,
 		});
 
 		if (error) fail(error.message);

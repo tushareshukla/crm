@@ -1,3 +1,4 @@
+import { touchMembership } from "@crm/auth/organization";
 import { OrgStatus, runWithTenant } from "@crm/db";
 import { Injectable, Logger } from "@nestjs/common";
 import { TRPCError } from "@trpc/server";
@@ -7,7 +8,6 @@ import type {
 	TRPCMiddleware,
 } from "nestjs-trpc";
 import { AuditService } from "../../audit/audit.service";
-import { touchMembership } from "../../auth/platform";
 import { setRequestOrganizationId } from "../../logging/request-context";
 import type { AuthedTrpcContext, TenantTrpcContext } from "../context.types";
 

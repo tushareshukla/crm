@@ -5,13 +5,21 @@ import { Button } from "@crm/ui/components/button";
 import { Spinner } from "@crm/ui/components/spinner";
 import { useState } from "react";
 import { toast } from "sonner";
+import { signInPath } from "@/lib/home";
 
 export type SsoProvider = {
 	providerId: string;
 	name: string;
 };
 
-export function SsoSignIn({ providers }: { providers: SsoProvider[] }) {
+export function SsoSignIn({
+	providers,
+	next = "/",
+}: {
+	providers: SsoProvider[];
+	/** Where to land once signed in; the sign-in page keeps it safe. */
+	next?: string;
+}) {
 	const [pending, setPending] = useState<string | null>(null);
 
 	async function handleClick(providerId: string) {
@@ -21,8 +29,8 @@ export function SsoSignIn({ providers }: { providers: SsoProvider[] }) {
 
 		const { error } = await signIn.sso({
 			providerId,
-			callbackURL: `${origin}/`,
-			errorCallbackURL: `${origin}/sign-in`,
+			callbackURL: `${origin}${next}`,
+			errorCallbackURL: `${origin}${signInPath(next)}`,
 		});
 
 		if (error) {

@@ -117,7 +117,9 @@ describe("counting page views against a domain", () => {
 		await accept([view(child), view(child), view(parent)]);
 
 		const row = await db.trackedDomain.findUnique({
-			where: { organizationId_host: { organizationId: TEST_ORG.id, host: parent } },
+			where: {
+				organizationId_host: { organizationId: TEST_ORG.id, host: parent },
+			},
 			select: { pageViews: true },
 		});
 
@@ -144,7 +146,9 @@ describe("counting page views against a domain", () => {
 		]);
 
 		const row = await db.trackedDomain.findUnique({
-			where: { organizationId_host: { organizationId: TEST_ORG.id, host: parent } },
+			where: {
+				organizationId_host: { organizationId: TEST_ORG.id, host: parent },
+			},
 			select: { pageViews: true },
 		});
 

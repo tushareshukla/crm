@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { AuthHeading, AuthShell } from "@/components/auth-shell";
+import { loadOrganization } from "@/lib/organization";
 import { requireMailboxAccess } from "@/lib/session";
 import { ResearchForm } from "./research-form";
 
@@ -9,8 +11,12 @@ export const metadata: Metadata = {
 
 export const instant = false;
 
-export default async function ResearchKeyPage() {
-	await requireMailboxAccess();
+export default async function ResearchKeyPage({
+	params,
+}: PageProps<"/[slug]/onboarding/research">) {
+	const [, { slug }] = await Promise.all([requireMailboxAccess(), params]);
+
+	if (!(await loadOrganization(slug))) notFound();
 
 	return (
 		<AuthShell>

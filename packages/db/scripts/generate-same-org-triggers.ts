@@ -27,6 +27,11 @@ type Edge = {
 };
 const tables = new Map<string, string>();
 const edges: Edge[] = [];
+const tableOf = (model: string): string => {
+	const t = tables.get(model);
+	if (!t) throw new Error(`unknown model ${model}`);
+	return t;
+};
 
 for (const [, name, body] of schema.matchAll(
 	/^model (\w+) \{\n([\s\S]*?)^\}/gm,
@@ -52,9 +57,9 @@ for (const [, name, body] of schema.matchAll(
 		if (fks.length !== 1 || rs.length !== 1 || fks[0] === "organizationId")
 			continue;
 		edges.push({
-			table: tables.get(name)!,
+			table: tableOf(name),
 			fk: fks[0] as string,
-			parentTable: tables.get(target)!,
+			parentTable: tableOf(target),
 			parentCol: rs[0] as string,
 		});
 	}
@@ -83,12 +88,31 @@ BEGIN
   RETURN NEW;
 END
 $$ LANGUAGE plpgsql;
+
+-- A tenant row never changes organization.
+CREATE OR REPLACE FUNCTION crm_org_immutable() RETURNS trigger AS $$
+BEGIN
+  RAISE EXCEPTION 'organizationId is immutable: %.% cannot move from % to %',
+    TG_TABLE_NAME, 'organizationId', OLD."organizationId", NEW."organizationId"
+    USING ERRCODE = '23514';
+END
+$$ LANGUAGE plpgsql;
 `);
+const tenantTables = [...new Set(TENANT_MODELS.map((m) => tableOf(m)))].sort();
+for (const t of tenantTables) {
+	const name = `${t}_org_immutable`;
+	out.push(`DROP TRIGGER IF EXISTS "${name}" ON "${t}";
+CREATE TRIGGER "${name}" BEFORE UPDATE OF "organizationId" ON "${t}"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();`);
+}
 for (const e of edges) {
 	const name = `${e.table}_${e.fk}_same_org`;
 	out.push(`DROP TRIGGER IF EXISTS "${name}" ON "${e.table}";
 CREATE TRIGGER "${name}" BEFORE INSERT OR UPDATE OF "${e.fk}", "organizationId" ON "${e.table}"
   FOR EACH ROW EXECUTE FUNCTION crm_assert_same_org('${e.fk}', '${e.parentTable}', '${e.parentCol}');`);
 }
-out.push(`-- ${edges.length} tenant→tenant foreign keys guarded`);
+out.push(
+	`-- ${edges.length} tenant→tenant foreign keys guarded; organizationId immutable on ${tenantTables.length} tables`,
+);
 process.stdout.write(`${out.join("\n")}\n`);

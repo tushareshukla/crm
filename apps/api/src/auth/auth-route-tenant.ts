@@ -47,7 +47,7 @@ export async function resolveAuthRouteTenant(
 		? memberships.find((m) => m.id === activeOrganizationId)
 		: undefined;
 	const chosen = bySlug ?? active ?? memberships[0];
-	if (!chosen || chosen.status !== "ACTIVE") return null;
+	if (chosen?.status !== "ACTIVE") return null;
 
 	if (activeOrganizationId !== chosen.id) {
 		await withoutTenant(async () => {

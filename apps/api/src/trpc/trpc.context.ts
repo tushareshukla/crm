@@ -4,11 +4,11 @@ import {
 	toWorkspaceRole,
 	type WorkspaceRole,
 } from "@crm/auth";
+import { isPlatformAdmin } from "@crm/auth/organization";
 import { type Db, withoutTenant } from "@crm/db";
 import { Injectable } from "@nestjs/common";
 import { fromNodeHeaders } from "better-auth/node";
 import type { ContextOptions, TRPCContext } from "nestjs-trpc";
-import { isPlatformAdmin } from "../auth/platform";
 import { InjectDatabase } from "../database/database.constants";
 import type { BaseTrpcContext, OrgContext } from "./context.types";
 

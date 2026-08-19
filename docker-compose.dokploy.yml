@@ -27,14 +27,10 @@ services:
       args:
         API_URL: ${API_URL}
         APP_URL: ${APP_URL}
-    command: >
-      sh -c "cd /app/packages/db && bun x prisma migrate deploy
-      && cd /app/apps/agent
-      && if [ -n \"$$CONTEXT_DEV_API_KEY\" ]; then bun -e \"import('@crm/db').then(async m=>{const s=await import('@crm/db/settings');await s.writeContextDevKey(m.db,process.env.CONTEXT_DEV_API_KEY);console.log('[seed] Context.dev key stored in AppSetting');process.exit(0)}).catch(e=>{console.error(e);process.exit(1)})\"; else echo '[seed] CONTEXT_DEV_API_KEY empty, skipping'; fi"
+    command: sh -c "cd /app/packages/db && bun x prisma migrate deploy"
     restart: "no"
     environment:
       DATABASE_URL: postgresql://crm:${POSTGRES_PASSWORD}@postgres:5432/crm?schema=public
-      CONTEXT_DEV_API_KEY: ${CONTEXT_DEV_API_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -51,6 +47,7 @@ services:
       DATABASE_URL: postgresql://crm:${POSTGRES_PASSWORD}@postgres:5432/crm?schema=public
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       ALLOWED_SIGN_IN: ${ALLOWED_SIGN_IN}
+      PLATFORM_ADMINS: ${PLATFORM_ADMINS}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID}
@@ -64,6 +61,8 @@ services:
       AGENT_URL: http://agent:2000
       AGENT_BRIDGE_SECRET: ${AGENT_BRIDGE_SECRET}
       CRON_SECRET: ${CRON_SECRET}
+      CONTEXT_DEV_API_KEY: ${CONTEXT_DEV_API_KEY}
+      PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY}
       BLOB_READ_WRITE_TOKEN: ${BLOB_READ_WRITE_TOKEN}
       REDIS_URL: ${REDIS_URL}
       CRM_TELEMETRY_DISABLED: ${CRM_TELEMETRY_DISABLED}
@@ -86,6 +85,7 @@ services:
       API_URL: ${API_URL}
       APP_URL: ${APP_URL}
       AUTH_COOKIE_DOMAIN: ${AUTH_COOKIE_DOMAIN}
+      PLATFORM_ADMINS: ${PLATFORM_ADMINS}
       AGENT_URL: http://agent:2000
       AGENT_BRIDGE_SECRET: ${AGENT_BRIDGE_SECRET}
       IS_MARKETING: ${IS_MARKETING}
@@ -110,6 +110,7 @@ services:
       APP_URL: ${APP_URL}
       AGENT_BRIDGE_SECRET: ${AGENT_BRIDGE_SECRET}
       AI_GATEWAY_API_KEY: ${AI_GATEWAY_API_KEY}
+      CONTEXT_DEV_API_KEY: ${CONTEXT_DEV_API_KEY}
       PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY}
       GITHUB_TOKEN: ${GITHUB_TOKEN}
       BLOB_READ_WRITE_TOKEN: ${BLOB_READ_WRITE_TOKEN}

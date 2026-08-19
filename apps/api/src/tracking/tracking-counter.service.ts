@@ -4,10 +4,10 @@ import { Injectable, Logger } from "@nestjs/common";
 import { InjectDatabase } from "../database/database.constants";
 
 /**
- * Counters are per organization. The table's key is global, so the stored key
- * is `${window}:${organizationId}` — `windowExpiry` still reads the window from
- * the first two segments. Raw SQL bypasses the tenant extension; the
- * organization is written by hand. Runs inside tenant scope.
+ * Counters are per organization: the primary key is `(organizationId, key)`.
+ * The stored key is still `${window}:${organizationId}` — `windowExpiry`
+ * reads the window from the first two segments. Raw SQL bypasses the tenant
+ * extension; the organization is written by hand. Runs inside tenant scope.
  */
 export function scopedCounterKey(key: string): string {
 	return `${key}:${currentTenantId()}`;
@@ -30,7 +30,7 @@ export class TrackingCounterService {
 			const charged = await this.db.$queryRaw<{ value: number }[]>`
 				INSERT INTO "trackingCounter" ("key", "value", "expiresAt", "organizationId")
 				VALUES (${scoped}, ${amount}, ${windowExpiry(key)}, ${organizationId})
-				ON CONFLICT ("key") DO UPDATE
+				ON CONFLICT ("organizationId", "key") DO UPDATE
 					SET "value" = "trackingCounter"."value" + ${amount}
 					WHERE "trackingCounter"."value" + ${amount} <= ${limit}
 				RETURNING "value";

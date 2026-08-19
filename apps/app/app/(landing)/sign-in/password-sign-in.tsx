@@ -9,11 +9,13 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 /**
- * Fork addition: email + password sign-in (and first-run sign-up) so a
- * self-hosted install works without a Google/Microsoft OAuth client. Who may
- * create an account is still decided by ALLOWED_SIGN_IN on the API.
+ * Fork addition: email + password sign-in (and sign-up) so a self-hosted
+ * install works without a Google/Microsoft OAuth client. Who may create an
+ * account is decided by the API: platform admins, anyone holding a pending
+ * invitation, and the ALLOWED_SIGN_IN list. `next` is where they land
+ * afterwards — the invitation link that sent them here, or `/`.
  */
-export function PasswordSignIn() {
+export function PasswordSignIn({ next = "/" }: { next?: string }) {
 	const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
 	const [pending, setPending] = useState(false);
 
@@ -27,7 +29,7 @@ export function PasswordSignIn() {
 
 		setPending(true);
 		const origin = window.location.origin;
-		const callbackURL = `${origin}/`;
+		const callbackURL = `${origin}${next}`;
 
 		const { error } =
 			mode === "sign-up"

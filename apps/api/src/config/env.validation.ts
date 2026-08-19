@@ -41,12 +41,13 @@ export class EnvironmentVariables {
 	})
 	BETTER_AUTH_SECRET!: string;
 
+	// Invite-only tenancy: accounts are created by platform admins or through
+	// invitations. ALLOWED_SIGN_IN is an optional escape hatch (domain/address
+	// allow-list). At least one of PLATFORM_ADMINS / ALLOWED_SIGN_IN must be set
+	// or nobody can ever get in — checked in validateEnv below.
+	@IsOptional()
 	@IsString()
-	@MinLength(1, {
-		message:
-			'ALLOWED_SIGN_IN is required — it is the only thing deciding who can sign in. Set it to your email domain, e.g. ALLOWED_SIGN_IN="acme.com", or to a single address for a one-person install.',
-	})
-	ALLOWED_SIGN_IN!: string;
+	ALLOWED_SIGN_IN?: string;
 
 	@IsOptional()
 	@IsString()
@@ -145,6 +146,14 @@ export function validateEnv(config: RawEnvironment): EnvironmentVariables {
 		skipMissingProperties: false,
 		whitelist: false,
 	});
+
+	const hasAdmins = Boolean(validated.PLATFORM_ADMINS?.trim());
+	const hasAllowList = Boolean(validated.ALLOWED_SIGN_IN?.trim());
+	if (!hasAdmins && !hasAllowList) {
+		throw new Error(
+			"Invalid environment configuration:\n  - Set PLATFORM_ADMINS (comma-separated emails of the people who create organizations) — or ALLOWED_SIGN_IN as an allow-list — otherwise nobody can sign in.\n\nSee .env.example at the root of the repo.",
+		);
+	}
 
 	if (errors.length > 0) {
 		const details = errors

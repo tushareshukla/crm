@@ -53,6 +53,7 @@ import {
 	ConversationPicker,
 	useConversations,
 } from "@/components/crm/agent-conversations";
+import { agentHeaders } from "@/lib/agent-headers";
 import {
 	type AgentRecord,
 	recordCopy,
@@ -156,7 +157,11 @@ function ThreadWithHistory({
 		refetchInterval: (query) =>
 			query.state.data?.status === "working" ? WORKING_POLL_MS : false,
 		queryFn: ({ signal }) =>
-			loadThread(conversation?.sessionId ?? "", recordHeader(record), signal),
+			loadThread(
+				conversation?.sessionId ?? "",
+				agentHeaders(recordHeader(record)),
+				signal,
+			),
 	});
 
 	const offline = thread.data?.status === "offline";
@@ -204,7 +209,7 @@ function Thread({
 }) {
 	const copy = recordCopy(record.kind);
 	const agent = useEveAgent({
-		headers: recordHeader(record),
+		headers: agentHeaders(recordHeader(record)),
 		...(thread && "session" in thread
 			? { initialSession: thread.session, initialEvents: eventsOf(thread) }
 			: { initialEvents: eventsOf(thread) }),

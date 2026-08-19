@@ -4,6 +4,7 @@ import { authClient } from "@crm/auth/client";
 import { Button } from "@crm/ui/components/button";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ORG_SLUG_HEADER } from "@/lib/org-slug";
 
 const CONNECT_ERRORS = new Map([
 	[
@@ -34,6 +35,8 @@ async function startSlackOAuth(slug: string) {
 			providerId: "slack",
 			callbackURL: `${window.location.origin}/${slug}/settings/connections/slack/people`,
 			errorCallbackURL: `${window.location.origin}/${slug}/settings/connections/slack?provider=slack`,
+			// The API files the installation under this organization.
+			fetchOptions: { headers: { [ORG_SLUG_HEADER]: slug } },
 		});
 		if (error) toast.error(error.message || "Could not connect Slack.");
 	} catch (error) {

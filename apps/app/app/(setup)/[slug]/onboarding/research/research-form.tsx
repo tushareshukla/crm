@@ -1,6 +1,6 @@
 "use client";
 
-import { CONTEXT_DEV_SIGNUP_URL } from "@crm/db/settings";
+import { CONTEXT_DEV_SIGNUP_URL } from "@crm/db/context-dev";
 import { Button } from "@crm/ui/components/button";
 import {
 	Field,
@@ -15,10 +15,12 @@ import { useRouter } from "next/navigation";
 import { useId } from "react";
 import { toast } from "sonner";
 import { useTRPC } from "@/lib/trpc/client";
+import { useWorkspaceUrl } from "@/lib/use-workspace-url";
 
 export function ResearchForm() {
 	const trpc = useTRPC();
 	const router = useRouter();
+	const workspaceUrl = useWorkspaceUrl();
 
 	const keyId = useId();
 
@@ -26,7 +28,7 @@ export function ResearchForm() {
 		trpc.settings.setResearchKey.mutationOptions({
 			onSuccess: () => {
 				router.refresh();
-				router.replace("/");
+				router.replace(workspaceUrl());
 			},
 			onError: (error) => toast.error(error.message),
 		}),

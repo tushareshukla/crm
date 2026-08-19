@@ -1,10 +1,10 @@
+import { currentTenantId } from "@crm/db";
 import {
 	BadRequestException,
 	Injectable,
 	Logger,
 	ServiceUnavailableException,
 } from "@nestjs/common";
-import { currentTenantId } from "@crm/db";
 import { bridge } from "../agent/bridge";
 import { slackCreateChannelReply } from "./slack.contracts";
 

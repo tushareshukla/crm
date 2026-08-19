@@ -8,7 +8,6 @@
  * preload in ./setup.ts, and on first use as a fallback). `describe` and
  * `expect` stay on `bun:test`.
  */
-import { randomUUID } from "node:crypto";
 import {
 	afterAll as baseAfterAll,
 	afterEach as baseAfterEach,
@@ -16,6 +15,7 @@ import {
 	beforeEach as baseBeforeEach,
 	it as baseIt,
 } from "bun:test";
+import { randomUUID } from "node:crypto";
 import type { WorkspaceRole } from "@crm/auth";
 import { db, OrgStatus, runWithTenant, withoutTenant } from "@crm/db";
 import type { Test as SupertestRequest } from "supertest";

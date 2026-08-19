@@ -1,6 +1,5 @@
 import type { Db } from "./client";
 import {
-	type JsonObject,
 	type JsonValue,
 	jsonObject,
 	jsonText,
@@ -14,69 +13,19 @@ export function workspaceId(): string {
 	return currentTenantId();
 }
 
-export const DEFAULT_WORKSPACE_SLUG = "workspace";
+// Pure rules (slug, onboarding metadata) are client-safe and live in ./workspace-rules.
+export {
+	DEFAULT_WORKSPACE_SLUG,
+	isOnboarded,
+	MAX_LINE,
+	MAX_NARRATIVE,
+	MAX_SLUG,
+	markOnboarded,
+	RESERVED_SLUGS,
+	workspaceSlug,
+} from "./workspace-rules";
 
-export const MAX_SLUG = 48;
-
-export const RESERVED_SLUGS: readonly string[] = [
-	"_next",
-	"api",
-	"agent",
-	"agents",
-	"chat",
-	"companies",
-	"contacts",
-	"deals",
-	"eve",
-	"grant-access",
-	"onboarding",
-	"settings",
-	"sign-in",
-];
-
-export function workspaceSlug(name: string): string {
-	const base = name
-		.normalize("NFKD")
-		.replace(/\p{M}/gu, "")
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.slice(0, MAX_SLUG)
-		.replace(/^-+|-+$/g, "");
-
-	if (!base) return DEFAULT_WORKSPACE_SLUG;
-
-	return RESERVED_SLUGS.includes(base) ? `${base}-crm` : base;
-}
-
-export const MAX_NARRATIVE = 320;
-
-export const MAX_LINE = 140;
-
-export function isOnboarded(metadata: string | null): boolean {
-	return jsonText(readMetadata(metadata).onboardedAt) !== undefined;
-}
-
-export function markOnboarded(metadata: string | null, at: Date): string {
-	const current = readMetadata(metadata);
-
-	return JSON.stringify(
-		jsonText(current.onboardedAt) === undefined
-			? { ...current, onboardedAt: at.toISOString() }
-			: current,
-	);
-}
-
-function readMetadata(metadata: string | null): JsonObject {
-	if (!metadata) return {};
-
-	try {
-		const parsed: JsonValue = JSON.parse(metadata);
-
-		return jsonObject(parsed);
-	} catch {
-		return {};
-	}
-}
+import { MAX_LINE, MAX_NARRATIVE } from "./workspace-rules";
 
 export type WorkspaceProfile = {
 	website: string;

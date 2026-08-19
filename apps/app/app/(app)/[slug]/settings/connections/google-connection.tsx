@@ -42,6 +42,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 import { LocalRelativeTime } from "@/components/local-date-time";
+import { ORG_SLUG_HEADER } from "@/lib/org-slug";
 import { isSyncing, SYNC_POLL_MS } from "@/lib/sync-status";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
@@ -154,6 +155,8 @@ function ConnectGoogle({
 			scopes: [...SYNC_SCOPES],
 			callbackURL: `${origin}/${slug}/settings/connections/google`,
 			errorCallbackURL: `${origin}/${slug}/settings/connections/google?provider=google`,
+			// The API files the connection under this organization.
+			fetchOptions: { headers: { [ORG_SLUG_HEADER]: slug } },
 		});
 
 		if (error) fail(error.message);

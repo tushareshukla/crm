@@ -1,6 +1,5 @@
 "use client";
 
-import { workspaceSlug } from "@crm/db/workspace";
 import { Button } from "@crm/ui/components/button";
 import {
 	Field,
@@ -16,28 +15,49 @@ import {
 	InputGroupText,
 } from "@crm/ui/components/input-group";
 import { Spinner } from "@crm/ui/components/spinner";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useId, useRef, useState } from "react";
 import { toast } from "sonner";
+import { researchPath } from "@/lib/setup-paths";
+import { slugDraft, slugify } from "@/lib/slugify";
 import { useTRPC } from "@/lib/trpc/client";
+import { useWorkspaceSlug } from "@/lib/use-workspace-url";
 
 export function OnboardingForm({ placeholder }: { placeholder: string }) {
 	const trpc = useTRPC();
 	const router = useRouter();
+	const currentSlug = useWorkspaceSlug();
+
+	// The platform admin already named the organization; start from that.
+	const workspace = useQuery(trpc.workspace.get.queryOptions());
 
 	const nameId = useId();
 	const slugId = useId();
 	const websiteId = useId();
-	const [name, setName] = useState("");
-	const [slug, setSlug] = useState("");
+	const [draft, setDraft] = useState<{ name: string; slug: string } | null>(
+		null,
+	);
 	const slugEdited = useRef(false);
+
+	const values = draft ?? {
+		name: workspace.data?.name ?? "",
+		slug: workspace.data?.slug ?? currentSlug,
+	};
 
 	const save = useMutation(
 		trpc.workspace.update.mutationOptions({
-			onSuccess: () => {
+			onSuccess: (saved) => {
+				const next = researchPath(saved.slug);
+
+				// A new address means a new tenant URL: start it from a clean cache.
+				if (saved.slug !== currentSlug) {
+					window.location.assign(next);
+					return;
+				}
+
 				router.refresh();
-				router.replace("/onboarding/research");
+				router.replace(next);
 			},
 			onError: (error) => toast.error(error.message),
 		}),
@@ -51,8 +71,8 @@ export function OnboardingForm({ placeholder }: { placeholder: string }) {
 				const form = new FormData(event.currentTarget);
 
 				save.mutate({
-					name: String(form.get("name") ?? "").trim(),
-					slug: workspaceSlug(String(form.get("slug") ?? "")),
+					name: values.name.trim(),
+					slug: slugify(values.slug) || undefined,
 					website: String(form.get("website") ?? "").trim(),
 				});
 			}}
@@ -64,11 +84,13 @@ export function OnboardingForm({ placeholder }: { placeholder: string }) {
 					<Input
 						id={nameId}
 						name="name"
-						value={name}
+						value={values.name}
 						onChange={(event) => {
-							const next = event.target.value;
-							setName(next);
-							if (!slugEdited.current) setSlug(workspaceSlug(next));
+							const name = event.target.value;
+							setDraft({
+								name,
+								slug: slugEdited.current ? values.slug : slugify(name),
+							});
 						}}
 						placeholder={placeholder}
 						autoComplete="organization"
@@ -86,15 +108,13 @@ export function OnboardingForm({ placeholder }: { placeholder: string }) {
 						<InputGroupInput
 							id={slugId}
 							name="slug"
-							value={slug}
+							value={values.slug}
 							onChange={(event) => {
 								slugEdited.current = true;
-								setSlug(workspaceSlugDraft(event.target.value));
+								setDraft({ ...values, slug: slugDraft(event.target.value) });
 							}}
-							onBlur={() =>
-								setSlug((value) => (value ? workspaceSlug(value) : ""))
-							}
-							placeholder={workspaceSlug(placeholder)}
+							onBlur={() => setDraft({ ...values, slug: slugify(values.slug) })}
+							placeholder={slugify(placeholder)}
 							autoComplete="off"
 							autoCapitalize="off"
 							autoCorrect="off"
@@ -116,6 +136,7 @@ export function OnboardingForm({ placeholder }: { placeholder: string }) {
 						<InputGroupInput
 							id={websiteId}
 							name="website"
+							defaultValue={workspace.data?.website ?? ""}
 							placeholder="acme.com"
 							autoComplete="off"
 							autoCapitalize="off"
@@ -137,12 +158,4 @@ export function OnboardingForm({ placeholder }: { placeholder: string }) {
 			</Button>
 		</form>
 	);
-}
-
-function workspaceSlugDraft(value: string): string {
-	return value
-		.toLowerCase()
-		.replace(/[^a-z0-9-]+/g, "-")
-		.replace(/-{2,}/g, "-")
-		.replace(/^-+/, "");
 }

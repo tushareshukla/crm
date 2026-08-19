@@ -18,25 +18,29 @@ import {
 import Logo from "@crm/ui/components/logo";
 import { Separator } from "@crm/ui/components/separator";
 import { Skeleton } from "@crm/ui/components/skeleton";
-import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { EnrichmentQueue } from "@/components/enrichment-queue";
 import { useMobileNav } from "@/components/mobile-nav";
+import {
+	type CurrentOrganization,
+	OrgSwitcher,
+} from "@/components/org-switcher";
 import { signOutAndRedirect } from "@/lib/sign-out";
-import { useTRPC } from "@/lib/trpc/client";
 import { useWorkspaceUrl } from "@/lib/use-workspace-url";
-import { workspaceLabel } from "@/lib/workspace-label";
 
 type User = { name: string; email: string; image: string | null };
 
-export function AppHeader({ user }: { user: User }) {
+export function AppHeader({
+	user,
+	organization,
+}: {
+	user: User;
+	organization: CurrentOrganization;
+}) {
 	const { setOpen: setMobileNavOpen } = useMobileNav();
-	const trpc = useTRPC();
 	const workspaceUrl = useWorkspaceUrl();
-	const workspace = useQuery(trpc.workspace.get.queryOptions());
-	const label = workspaceLabel(workspace.data?.name);
 
 	return (
 		<header className="flex h-12 shrink-0 items-center gap-2 border-b px-3 [view-transition-name:app-header]">
@@ -58,7 +62,7 @@ export function AppHeader({ user }: { user: User }) {
 					<Logo className="size-5" />
 				</Link>
 				<Separator orientation="vertical" className="mx-1 h-5 bg-transparent" />
-				<span className="min-w-0 truncate font-medium text-sm">{label}</span>
+				<OrgSwitcher organization={organization} />
 			</div>
 
 			<div className="ml-auto flex shrink-0 items-center gap-1.5">
@@ -102,7 +106,13 @@ export function AppHeaderFallback() {
 	);
 }
 
-function UserMenu({ user, onSignOut }: { user: User; onSignOut: () => void }) {
+export function UserMenu({
+	user,
+	onSignOut,
+}: {
+	user: User;
+	onSignOut: () => void;
+}) {
 	const { resolvedTheme, setTheme } = useTheme();
 	const isDark = resolvedTheme === "dark";
 

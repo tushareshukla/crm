@@ -2,8 +2,10 @@
 
 import { signOut } from "@crm/auth/client";
 import { toast } from "sonner";
+import { signInPath } from "@/lib/home";
 
-export async function signOutAndRedirect() {
+/** Sign out and land on the sign-in page — remembering `next` when there is somewhere to come back to. */
+export async function signOutAndRedirect(next?: string) {
 	const { error } = await signOut();
 
 	if (error) {
@@ -11,5 +13,5 @@ export async function signOutAndRedirect() {
 		return;
 	}
 
-	window.location.assign("/sign-in");
+	window.location.assign(signInPath(next));
 }

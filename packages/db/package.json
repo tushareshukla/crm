@@ -22,6 +22,8 @@
 		"./json": "./src/json.ts",
 		"./safe-fetch": "./src/safe-fetch.ts",
 		"./settings": "./src/settings.ts",
+		"./context-dev": "./src/context-dev.ts",
+		"./workspace-rules": "./src/workspace-rules.ts",
 		"./tenant": "./src/tenant.ts",
 		"./slack-inventory": "./src/slack-inventory.ts",
 		"./tracking": "./src/tracking.ts",

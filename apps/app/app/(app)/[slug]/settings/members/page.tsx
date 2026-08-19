@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import {
 	PageShell,
+	PageShellActions,
 	PageShellContent,
 	PageShellDescription,
 	PageShellHeader,
@@ -12,8 +13,10 @@ import {
 import { requireSession } from "@/lib/session";
 import { HydrateClient } from "@/lib/trpc/hydrate";
 import { getServerQueryClient, getServerTrpc } from "@/lib/trpc/server";
+import { InviteDialog } from "./invite-dialog";
 import { membersSearchParams } from "./members-search-params";
 import { MembersTable } from "./members-table";
+import { PendingInvites } from "./pending-invites";
 
 export const metadata: Metadata = {
 	title: "Members",
@@ -28,9 +31,14 @@ export default function MembersSettingsPage({
 				<PageShellHeading>
 					<PageShellTitle>Members</PageShellTitle>
 					<PageShellDescription>
-						Everyone who has access to your CRM.
+						Everyone who has access to your CRM. Invitations are links you send
+						yourself.
 					</PageShellDescription>
 				</PageShellHeading>
+
+				<PageShellActions>
+					<InviteDialog />
+				</PageShellActions>
 			</PageShellHeader>
 
 			<PageShellContent className="min-h-0">
@@ -61,6 +69,7 @@ async function Members({
 
 	return (
 		<HydrateClient>
+			<PendingInvites />
 			<MembersTable />
 		</HydrateClient>
 	);

@@ -21,6 +21,199 @@ BEGIN
 END
 $$ LANGUAGE plpgsql;
 
+-- A tenant row never changes organization.
+CREATE OR REPLACE FUNCTION crm_org_immutable() RETURNS trigger AS $$
+BEGIN
+  RAISE EXCEPTION 'organizationId is immutable: %.% cannot move from % to %',
+    TG_TABLE_NAME, 'organizationId', OLD."organizationId", NEW."organizationId"
+    USING ERRCODE = '23514';
+END
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS "activity_org_immutable" ON "activity";
+CREATE TRIGGER "activity_org_immutable" BEFORE UPDATE OF "organizationId" ON "activity"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "agentAction_org_immutable" ON "agentAction";
+CREATE TRIGGER "agentAction_org_immutable" BEFORE UPDATE OF "organizationId" ON "agentAction"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "agentAuditEvent_org_immutable" ON "agentAuditEvent";
+CREATE TRIGGER "agentAuditEvent_org_immutable" BEFORE UPDATE OF "organizationId" ON "agentAuditEvent"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "agentBuilderArtifact_org_immutable" ON "agentBuilderArtifact";
+CREATE TRIGGER "agentBuilderArtifact_org_immutable" BEFORE UPDATE OF "organizationId" ON "agentBuilderArtifact"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "agentConversation_org_immutable" ON "agentConversation";
+CREATE TRIGGER "agentConversation_org_immutable" BEFORE UPDATE OF "organizationId" ON "agentConversation"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "agentConversationAttachment_org_immutable" ON "agentConversationAttachment";
+CREATE TRIGGER "agentConversationAttachment_org_immutable" BEFORE UPDATE OF "organizationId" ON "agentConversationAttachment"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "agentConversationFeedback_org_immutable" ON "agentConversationFeedback";
+CREATE TRIGGER "agentConversationFeedback_org_immutable" BEFORE UPDATE OF "organizationId" ON "agentConversationFeedback"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "agentConversationShare_org_immutable" ON "agentConversationShare";
+CREATE TRIGGER "agentConversationShare_org_immutable" BEFORE UPDATE OF "organizationId" ON "agentConversationShare"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "agentConversationSubmission_org_immutable" ON "agentConversationSubmission";
+CREATE TRIGGER "agentConversationSubmission_org_immutable" BEFORE UPDATE OF "organizationId" ON "agentConversationSubmission"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "agentDefinition_org_immutable" ON "agentDefinition";
+CREATE TRIGGER "agentDefinition_org_immutable" BEFORE UPDATE OF "organizationId" ON "agentDefinition"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "agentEvent_org_immutable" ON "agentEvent";
+CREATE TRIGGER "agentEvent_org_immutable" BEFORE UPDATE OF "organizationId" ON "agentEvent"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "agentRun_org_immutable" ON "agentRun";
+CREATE TRIGGER "agentRun_org_immutable" BEFORE UPDATE OF "organizationId" ON "agentRun"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "agentRunEvent_org_immutable" ON "agentRunEvent";
+CREATE TRIGGER "agentRunEvent_org_immutable" BEFORE UPDATE OF "organizationId" ON "agentRunEvent"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "agentTask_org_immutable" ON "agentTask";
+CREATE TRIGGER "agentTask_org_immutable" BEFORE UPDATE OF "organizationId" ON "agentTask"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "agentTrigger_org_immutable" ON "agentTrigger";
+CREATE TRIGGER "agentTrigger_org_immutable" BEFORE UPDATE OF "organizationId" ON "agentTrigger"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "agentVersion_org_immutable" ON "agentVersion";
+CREATE TRIGGER "agentVersion_org_immutable" BEFORE UPDATE OF "organizationId" ON "agentVersion"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "appSetting_org_immutable" ON "appSetting";
+CREATE TRIGGER "appSetting_org_immutable" BEFORE UPDATE OF "organizationId" ON "appSetting"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "auditEvent_org_immutable" ON "auditEvent";
+CREATE TRIGGER "auditEvent_org_immutable" BEFORE UPDATE OF "organizationId" ON "auditEvent"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "calendarAttendee_org_immutable" ON "calendarAttendee";
+CREATE TRIGGER "calendarAttendee_org_immutable" BEFORE UPDATE OF "organizationId" ON "calendarAttendee"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "calendarEvent_org_immutable" ON "calendarEvent";
+CREATE TRIGGER "calendarEvent_org_immutable" BEFORE UPDATE OF "organizationId" ON "calendarEvent"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "company_org_immutable" ON "company";
+CREATE TRIGGER "company_org_immutable" BEFORE UPDATE OF "organizationId" ON "company"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "companyEnrichment_org_immutable" ON "companyEnrichment";
+CREATE TRIGGER "companyEnrichment_org_immutable" BEFORE UPDATE OF "organizationId" ON "companyEnrichment"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "contact_org_immutable" ON "contact";
+CREATE TRIGGER "contact_org_immutable" BEFORE UPDATE OF "organizationId" ON "contact"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "contactBrief_org_immutable" ON "contactBrief";
+CREATE TRIGGER "contactBrief_org_immutable" BEFORE UPDATE OF "organizationId" ON "contactBrief"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "contactFact_org_immutable" ON "contactFact";
+CREATE TRIGGER "contactFact_org_immutable" BEFORE UPDATE OF "organizationId" ON "contactFact"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "deal_org_immutable" ON "deal";
+CREATE TRIGGER "deal_org_immutable" BEFORE UPDATE OF "organizationId" ON "deal"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "dealContact_org_immutable" ON "dealContact";
+CREATE TRIGGER "dealContact_org_immutable" BEFORE UPDATE OF "organizationId" ON "dealContact"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "emailMessage_org_immutable" ON "emailMessage";
+CREATE TRIGGER "emailMessage_org_immutable" BEFORE UPDATE OF "organizationId" ON "emailMessage"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "emailThread_org_immutable" ON "emailThread";
+CREATE TRIGGER "emailThread_org_immutable" BEFORE UPDATE OF "organizationId" ON "emailThread"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "fieldDefinition_org_immutable" ON "fieldDefinition";
+CREATE TRIGGER "fieldDefinition_org_immutable" BEFORE UPDATE OF "organizationId" ON "fieldDefinition"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "fieldOption_org_immutable" ON "fieldOption";
+CREATE TRIGGER "fieldOption_org_immutable" BEFORE UPDATE OF "organizationId" ON "fieldOption"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "fieldValue_org_immutable" ON "fieldValue";
+CREATE TRIGGER "fieldValue_org_immutable" BEFORE UPDATE OF "organizationId" ON "fieldValue"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "formSubmission_org_immutable" ON "formSubmission";
+CREATE TRIGGER "formSubmission_org_immutable" BEFORE UPDATE OF "organizationId" ON "formSubmission"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "mailboxSync_org_immutable" ON "mailboxSync";
+CREATE TRIGGER "mailboxSync_org_immutable" BEFORE UPDATE OF "organizationId" ON "mailboxSync"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "slackChannel_org_immutable" ON "slackChannel";
+CREATE TRIGGER "slackChannel_org_immutable" BEFORE UPDATE OF "organizationId" ON "slackChannel"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "slackInstallation_org_immutable" ON "slackInstallation";
+CREATE TRIGGER "slackInstallation_org_immutable" BEFORE UPDATE OF "organizationId" ON "slackInstallation"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "slackMemberMatch_org_immutable" ON "slackMemberMatch";
+CREATE TRIGGER "slackMemberMatch_org_immutable" BEFORE UPDATE OF "organizationId" ON "slackMemberMatch"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "slackWorkspaceGrant_org_immutable" ON "slackWorkspaceGrant";
+CREATE TRIGGER "slackWorkspaceGrant_org_immutable" BEFORE UPDATE OF "organizationId" ON "slackWorkspaceGrant"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "suppressedContact_org_immutable" ON "suppressedContact";
+CREATE TRIGGER "suppressedContact_org_immutable" BEFORE UPDATE OF "organizationId" ON "suppressedContact"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "suppressedDomain_org_immutable" ON "suppressedDomain";
+CREATE TRIGGER "suppressedDomain_org_immutable" BEFORE UPDATE OF "organizationId" ON "suppressedDomain"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "trackedDomain_org_immutable" ON "trackedDomain";
+CREATE TRIGGER "trackedDomain_org_immutable" BEFORE UPDATE OF "organizationId" ON "trackedDomain"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "trackedEvent_org_immutable" ON "trackedEvent";
+CREATE TRIGGER "trackedEvent_org_immutable" BEFORE UPDATE OF "organizationId" ON "trackedEvent"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "trackedPageDaily_org_immutable" ON "trackedPageDaily";
+CREATE TRIGGER "trackedPageDaily_org_immutable" BEFORE UPDATE OF "organizationId" ON "trackedPageDaily"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "trackedVisitor_org_immutable" ON "trackedVisitor";
+CREATE TRIGGER "trackedVisitor_org_immutable" BEFORE UPDATE OF "organizationId" ON "trackedVisitor"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "trackingCounter_org_immutable" ON "trackingCounter";
+CREATE TRIGGER "trackingCounter_org_immutable" BEFORE UPDATE OF "organizationId" ON "trackingCounter"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
+DROP TRIGGER IF EXISTS "workspaceProfile_org_immutable" ON "workspaceProfile";
+CREATE TRIGGER "workspaceProfile_org_immutable" BEFORE UPDATE OF "organizationId" ON "workspaceProfile"
+  FOR EACH ROW WHEN (OLD."organizationId" IS DISTINCT FROM NEW."organizationId")
+  EXECUTE FUNCTION crm_org_immutable();
 DROP TRIGGER IF EXISTS "company_primaryContactId_same_org" ON "company";
 CREATE TRIGGER "company_primaryContactId_same_org" BEFORE INSERT OR UPDATE OF "primaryContactId", "organizationId" ON "company"
   FOR EACH ROW EXECUTE FUNCTION crm_assert_same_org('primaryContactId', 'contact', 'id');
@@ -159,4 +352,4 @@ CREATE TRIGGER "trackedVisitor_contactId_same_org" BEFORE INSERT OR UPDATE OF "c
 DROP TRIGGER IF EXISTS "formSubmission_contactId_same_org" ON "formSubmission";
 CREATE TRIGGER "formSubmission_contactId_same_org" BEFORE INSERT OR UPDATE OF "contactId", "organizationId" ON "formSubmission"
   FOR EACH ROW EXECUTE FUNCTION crm_assert_same_org('contactId', 'contact', 'id');
--- 46 tenant→tenant foreign keys guarded
+-- 46 tenant→tenant foreign keys guarded; organizationId immutable on 46 tables

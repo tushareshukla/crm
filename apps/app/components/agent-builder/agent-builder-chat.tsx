@@ -61,6 +61,7 @@ import {
 	latestCompletedArtifactVersionId,
 	reviewVersionId,
 } from "@/lib/agent-builder-state";
+import { agentHeaders } from "@/lib/agent-headers";
 import { toolLabel } from "@/lib/agent-tool-display";
 import {
 	type AgentTurnFailure,
@@ -583,7 +584,7 @@ function BuilderEventFollower({
 	useMountEffect(() => {
 		const controller = new AbortController();
 		const client = new Client({
-			headers: { "x-crm-builder-conversation": conversationId },
+			headers: agentHeaders({ "x-crm-builder-conversation": conversationId }),
 			host: "",
 		});
 
@@ -1074,7 +1075,7 @@ function BuildingAgentCard({
 			if (!sessionId) return;
 			const response = await fetch(`/eve/v1/session/${sessionId}/cancel`, {
 				method: "POST",
-				headers: { "x-crm-builder-conversation": conversationId },
+				headers: agentHeaders({ "x-crm-builder-conversation": conversationId }),
 			});
 			if (!response.ok) throw new Error(await response.text());
 		},

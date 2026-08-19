@@ -1,10 +1,15 @@
-import { db } from "@crm/db";
+import { db, OrgStatus, runWithTenant } from "@crm/db";
 import { connection } from "next/server";
 import {
 	AGENT_URL,
 	bridgeConfigured,
 	mintBridgeToken,
 } from "@/lib/agent-bridge";
+import { ORG_SLUG_HEADER } from "@/lib/org-slug";
+import {
+	organizationAccess,
+	requestedOrgSlug,
+} from "@/lib/organization-access";
 import { getSession } from "@/lib/session";
 
 async function handler(request: Request): Promise<Response> {
@@ -20,6 +25,30 @@ async function handler(request: Request): Promise<Response> {
 	const session = await getSession();
 	if (!session) {
 		return Response.json({ error: "Not signed in." }, { status: 401 });
+	}
+
+	// The organization decides what the agent may see; a request that names
+	// none gets nothing rather than an unscoped session.
+	const slug = requestedOrgSlug(request);
+	if (!slug) {
+		return Response.json(
+			{ error: "The request names no organization." },
+			{ status: 403 },
+		);
+	}
+
+	const organization = await organizationAccess(session.user, slug);
+	if (!organization) {
+		return Response.json(
+			{ error: "No organization with that address." },
+			{ status: 404 },
+		);
+	}
+	if (organization.status === OrgStatus.SUSPENDED) {
+		return Response.json(
+			{ error: "This organization is suspended." },
+			{ status: 403 },
+		);
 	}
 
 	const url = new URL(request.url);
@@ -55,37 +84,41 @@ async function handler(request: Request): Promise<Response> {
 	headers.delete("x-crm-deal");
 	headers.delete("x-crm-builder-conversation");
 
-	if (requestedSession) {
-		const conversation = await db.agentConversation.findUnique({
-			where: { sessionId: requestedSession },
-			select: { userId: true },
-		});
-		if (conversation && conversation.userId !== session.user.id) {
-			return Response.json(
-				{ error: "Conversation not found." },
-				{ status: 404 },
-			);
+	// Conversations are tenant rows: read them inside the organization, so a
+	// session id from another organization is simply not found.
+	const refused = await runWithTenant(organization.id, async () => {
+		if (requestedSession) {
+			const conversation = await db.agentConversation.findUnique({
+				where: { sessionId: requestedSession },
+				select: { userId: true },
+			});
+			if (conversation && conversation.userId !== session.user.id) {
+				return true;
+			}
 		}
-	}
 
-	if (builderConversationId) {
-		const conversation = await db.agentConversation.findFirst({
-			where: {
-				id: builderConversationId,
-				userId: session.user.id,
-				kind: "BUILDER",
-			},
-			select: { sessionId: true },
-		});
-		if (
-			!conversation ||
-			(requestedSession && conversation.sessionId !== requestedSession)
-		) {
-			return Response.json(
-				{ error: "Conversation not found." },
-				{ status: 404 },
-			);
+		if (builderConversationId) {
+			const conversation = await db.agentConversation.findFirst({
+				where: {
+					id: builderConversationId,
+					userId: session.user.id,
+					kind: "BUILDER",
+				},
+				select: { sessionId: true },
+			});
+			if (
+				!conversation ||
+				(requestedSession && conversation.sessionId !== requestedSession)
+			) {
+				return true;
+			}
 		}
+
+		return false;
+	});
+
+	if (refused) {
+		return Response.json({ error: "Conversation not found." }, { status: 404 });
 	}
 
 	headers.set(
@@ -97,12 +130,14 @@ async function handler(request: Request): Promise<Response> {
 				name: session.user.name,
 			},
 			{
+				organizationId: organization.id,
 				contactId: cuid(contactId),
 				companyId: cuid(companyId),
 				dealId: cuid(dealId),
 			},
 		)}`,
 	);
+	headers.set(ORG_SLUG_HEADER, organization.slug);
 
 	const init: RequestInit & { duplex?: "half" } = {
 		method: request.method,

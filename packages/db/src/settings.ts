@@ -61,9 +61,11 @@ export async function writeAgentModel(
 	});
 }
 
-export const CONTEXT_DEV_SIGNUP_URL = "https://link.context.dev/crm";
-
-export const CONTEXT_DEV_DISCOUNT_CODE = "CRM";
+// Client-safe constants live in ./context-dev; re-exported here for server code.
+export {
+	CONTEXT_DEV_DISCOUNT_CODE,
+	CONTEXT_DEV_SIGNUP_URL,
+} from "./context-dev";
 
 export async function readContextDevKey(db: Db): Promise<string | null> {
 	const row = await db.appSetting.findUnique({
