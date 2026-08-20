@@ -144,7 +144,9 @@ ADD COLUMN     "suspendedAt" TIMESTAMP(3),
 ADD COLUMN     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 -- AlterTable
-ALTER TABLE "slackChannel" ADD COLUMN     "organizationId" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "slackChannel" DROP CONSTRAINT "slackChannel_pkey",
+ADD COLUMN     "organizationId" TEXT NOT NULL DEFAULT '',
+ADD CONSTRAINT "slackChannel_pkey" PRIMARY KEY ("organizationId", "id");
 
 -- AlterTable
 ALTER TABLE "slackInstallation" DROP CONSTRAINT "slackInstallation_pkey",

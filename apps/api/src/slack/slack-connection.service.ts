@@ -4,6 +4,7 @@ import {
 	workspaceId,
 } from "@crm/auth";
 import type { Db, Prisma } from "@crm/db";
+import { currentTenantId } from "@crm/db";
 import { schemas } from "@crm/validation";
 import {
 	BadRequestException,
@@ -189,7 +190,14 @@ export class SlackConnectionService {
 				where,
 				orderBy: [{ isMember: "desc" }, { name: "asc" }, { id: "asc" }],
 				take: take + 1,
-				cursor: input.cursor ? { id: input.cursor } : undefined,
+				cursor: input.cursor
+					? {
+							organizationId_id: {
+								organizationId: currentTenantId(),
+								id: input.cursor,
+							},
+						}
+					: undefined,
 				skip: input.cursor ? 1 : undefined,
 				select: {
 					id: true,
@@ -222,7 +230,12 @@ export class SlackConnectionService {
 	async joinChannel(input: SlackJoinChannelInput, userId: string) {
 		await this.access.assertMember(userId);
 		const channel = await this.db.slackChannel.findUnique({
-			where: { id: input.channelId },
+			where: {
+				organizationId_id: {
+					organizationId: currentTenantId(),
+					id: input.channelId,
+				},
+			},
 			select: { id: true, name: true, isMember: true, isPrivate: true },
 		});
 		if (!channel) throw new NotFoundException("No such Slack channel.");
@@ -233,7 +246,12 @@ export class SlackConnectionService {
 		});
 		if (channel.isPrivate && !grant) {
 			await this.db.slackChannel.update({
-				where: { id: channel.id },
+				where: {
+					organizationId_id: {
+						organizationId: currentTenantId(),
+						id: channel.id,
+					},
+				},
 				data: { inviteRequestedAt: new Date() },
 			});
 			return { queued: false, alreadyJoined: false };

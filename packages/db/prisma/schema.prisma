@@ -75,7 +75,7 @@ model SlackChannel {
   organizationId String       @default("")
   organization   Organization @relation("OrgSlackChannel", fields: [organizationId], references: [id], onDelete: Cascade)
 
-  id                String    @id
+  id                String
   name              String
   memberCount       Int?
   available         Boolean   @default(true)
@@ -86,6 +86,7 @@ model SlackChannel {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
+  @@id([organizationId, id])
   @@index([available, name])
   @@index([updatedAt])
   @@index([organizationId])

@@ -1,7 +1,13 @@
 import { describe, expect } from "bun:test";
 import { db } from "@crm/db";
 import { joinSlackChannel } from "../agent/lib/slack-membership";
-import { afterEach, beforeEach, ensureMember, it } from "./support/tenant";
+import {
+	afterEach,
+	beforeEach,
+	ensureMember,
+	it,
+	TEST_ORGANIZATION,
+} from "./support/tenant";
 
 const USER_ID = "slack-join-spec-user";
 const ACCOUNT_ID = "slack-join-spec-account";
@@ -99,7 +105,12 @@ describe("joining a Slack channel", () => {
 		expect(outcome).toMatchObject({ needsHuman: true });
 
 		const row = await db.slackChannel.findUnique({
-			where: { id: CHANNEL_ID },
+			where: {
+				organizationId_id: {
+					organizationId: TEST_ORGANIZATION.id,
+					id: CHANNEL_ID,
+				},
+			},
 			select: { isMember: true },
 		});
 		expect(row?.isMember).toBe(false);
@@ -120,7 +131,12 @@ describe("joining a Slack channel", () => {
 		);
 		expect(
 			await db.slackChannel.findUnique({
-				where: { id: CHANNEL_ID },
+				where: {
+					organizationId_id: {
+						organizationId: TEST_ORGANIZATION.id,
+						id: CHANNEL_ID,
+					},
+				},
 				select: { isPrivate: true, isMember: true },
 			}),
 		).toEqual({ isPrivate: true, isMember: true });
@@ -159,7 +175,12 @@ describe("joining a Slack channel", () => {
 		);
 		expect(
 			await db.slackChannel.findUnique({
-				where: { id: CHANNEL_ID },
+				where: {
+					organizationId_id: {
+						organizationId: TEST_ORGANIZATION.id,
+						id: CHANNEL_ID,
+					},
+				},
 				select: { isPrivate: true, isMember: true },
 			}),
 		).toEqual({ isPrivate: true, isMember: true });
@@ -173,7 +194,12 @@ describe("joining a Slack channel", () => {
 		expect(outcome).toEqual({ joined: true, already: true });
 
 		const row = await db.slackChannel.findUnique({
-			where: { id: CHANNEL_ID },
+			where: {
+				organizationId_id: {
+					organizationId: TEST_ORGANIZATION.id,
+					id: CHANNEL_ID,
+				},
+			},
 			select: { isMember: true },
 		});
 		expect(row?.isMember).toBe(true);

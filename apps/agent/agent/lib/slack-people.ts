@@ -215,7 +215,7 @@ export async function persistSlackChannels(
 				${available.map((channel) => channel.is_private ?? false)}::boolean[],
 				${available.map((channel) => channel.is_member ?? false)}::boolean[]
 			) AS incoming(id, name, "memberCount", "isPrivate", "isMember")
-			ON CONFLICT (id) DO UPDATE SET
+			ON CONFLICT ("organizationId", id) DO UPDATE SET
 				name = EXCLUDED.name,
 				"memberCount" = EXCLUDED."memberCount",
 				"isPrivate" = EXCLUDED."isPrivate",

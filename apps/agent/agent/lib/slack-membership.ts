@@ -1,4 +1,4 @@
-import { db } from "@crm/db";
+import { currentTenantId, db } from "@crm/db";
 import { schemas } from "@crm/validation";
 import { z } from "zod";
 import { SLACK } from "./slack-config";
@@ -115,7 +115,9 @@ async function classifyChannel(
 
 	await db.slackChannel
 		.update({
-			where: { id: channelId },
+			where: {
+				organizationId_id: { organizationId: currentTenantId(), id: channelId },
+			},
 			data: { ...live, classifiedAt: new Date() },
 		})
 		.catch(() => null);
@@ -128,7 +130,9 @@ export async function joinSlackChannel(
 	channelId: string,
 ): Promise<JoinOutcome> {
 	const channel = await db.slackChannel.findUnique({
-		where: { id: channelId },
+		where: {
+			organizationId_id: { organizationId: currentTenantId(), id: channelId },
+		},
 		select: { id: true, isPrivate: true, isMember: true },
 	});
 
@@ -165,7 +169,9 @@ export async function joinSlackChannel(
 	}
 
 	await db.slackChannel.update({
-		where: { id: channelId },
+		where: {
+			organizationId_id: { organizationId: currentTenantId(), id: channelId },
+		},
 		data: {
 			isMember: true,
 			available: true,
@@ -259,7 +265,9 @@ export async function createSlackChannel(
 	const channel = parsed.data.channel;
 
 	await db.slackChannel.upsert({
-		where: { id: channel.id },
+		where: {
+			organizationId_id: { organizationId: currentTenantId(), id: channel.id },
+		},
 		create: {
 			id: channel.id,
 			name: channel.name,

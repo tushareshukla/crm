@@ -4,7 +4,13 @@ import {
 	persistSlackChannels,
 	refreshSlackChannels,
 } from "../agent/lib/slack-people";
-import { afterEach, beforeEach, ensureMember, it } from "./support/tenant";
+import {
+	afterEach,
+	beforeEach,
+	ensureMember,
+	it,
+	TEST_ORGANIZATION,
+} from "./support/tenant";
 
 const USER_ID = "slack-people-spec-user";
 const ACCOUNT_ID = "slack-people-spec-account";
@@ -180,7 +186,12 @@ describe("persistSlackChannels", () => {
 		expect(await persistSlackChannels([], false)).toBe(0);
 
 		const row = await db.slackChannel.findUnique({
-			where: { id: `${PREFIX}-only` },
+			where: {
+				organizationId_id: {
+					organizationId: TEST_ORGANIZATION.id,
+					id: `${PREFIX}-only`,
+				},
+			},
 			select: { available: true },
 		});
 		expect(row?.available).toBe(false);
