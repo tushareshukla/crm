@@ -11,7 +11,14 @@ import { ConversionService } from "../src/currency/conversion.service";
 import { DealsService } from "../src/deals/deals.service";
 import { FieldsService } from "../src/fields/fields.service";
 import { withDiscardedCrmEvents } from "./agent-trigger.stub";
-import { afterAll, beforeAll, it } from "./tenant";
+import {
+	afterAll,
+	beforeAll,
+	createTestOrganization,
+	deleteTestOrganization,
+	it,
+	memberOf,
+} from "./tenant";
 
 const suffix = process.env.TEST_RUN_ID ?? "bulk-spec";
 const domain = `bulk-${suffix}.test`;
@@ -78,6 +85,8 @@ beforeAll(async () => {
 			{ id: secondOwnerId, name: "Second Rep", email: `second@${domain}` },
 		],
 	});
+	await memberOf(ownerId);
+	await memberOf(secondOwnerId);
 
 	const company = await db.company.create({
 		data: { name: `Bulk Co ${suffix}`, domain },
@@ -152,6 +161,56 @@ describe("assigning an owner to a selection", () => {
 				select: { ownerId: true },
 			}),
 		).toEqual({ ownerId: null });
+	});
+
+	it("refuses an owner who works in another organization only", async () => {
+		const other = await createTestOrganization(`bulk-other-${suffix}`);
+		const foreignId = `foreign-${suffix}`;
+		await db.user.create({
+			data: { id: foreignId, name: "Foreign Rep", email: `foreign@${domain}` },
+		});
+		await memberOf(foreignId, other.id);
+
+		try {
+			// Creating with a foreign owner…
+			await expect(
+				contacts.create({
+					firstName: "Eve",
+					email: `eve@${domain}`,
+					ownerId: foreignId,
+				}),
+			).rejects.toThrow(/does not work here/);
+			await expect(
+				deals.create({
+					name: `Foreign deal ${suffix}`,
+					companyId,
+					ownerId: foreignId,
+				}),
+			).rejects.toThrow(/does not work here/);
+
+			// …updating onto one…
+			await expect(
+				companies.update(companyId, { ownerId: foreignId }),
+			).rejects.toThrow(/does not work here/);
+
+			// …and assigning a selection to one are all refused.
+			const victim = await contacts.create({
+				firstName: "Safe",
+				email: `safe@${domain}`,
+			});
+			await expect(
+				contacts.bulkAssignOwner({ ids: [victim.id], ownerId: foreignId }),
+			).rejects.toThrow(/does not work here/);
+			expect(
+				await db.contact.findUnique({
+					where: { id: victim.id },
+					select: { ownerId: true },
+				}),
+			).toEqual({ ownerId: null });
+		} finally {
+			await deleteTestOrganization(other);
+			await db.user.deleteMany({ where: { id: foreignId } });
+		}
 	});
 });
 

@@ -5,7 +5,7 @@ import { ActivityStampService } from "../src/crm/activity-stamp.service";
 import { ConversionService } from "../src/currency/conversion.service";
 import { DealsService } from "../src/deals/deals.service";
 import { FieldsService } from "../src/fields/fields.service";
-import { afterAll, beforeAll, it } from "./tenant";
+import { afterAll, beforeAll, it, memberOf } from "./tenant";
 
 const suffix = crypto.randomUUID();
 const dealId = `event-deal-${suffix}`;
@@ -36,6 +36,7 @@ beforeAll(async () => {
 			email: `${ownerId}@example.test`,
 		},
 	});
+	await memberOf(ownerId);
 	const company = await db.company.create({
 		data: { name: "Event Test Company", domain },
 		select: { id: true },

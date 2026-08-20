@@ -425,7 +425,13 @@ export class FieldsService {
 		const definitions = await this.definitionsFor(entity, tx);
 
 		try {
-			await writeValues(tx, entity, recordId, definitions, values);
+			await writeValues(
+				this.scopedWriter(tx),
+				entity,
+				recordId,
+				definitions,
+				values,
+			);
 		} catch (error) {
 			if (error instanceof FieldValueError) {
 				throw new BadRequestException(error.message);
@@ -433,6 +439,30 @@ export class FieldsService {
 
 			throw error;
 		}
+	}
+
+	/**
+	 * `writeValues` checks USER-type values against the global User model; pin
+	 * that check to members of the current organization so a USER field can
+	 * never store a platform user who does not work here.
+	 */
+	private scopedWriter(tx: Tx) {
+		return {
+			fieldValue: tx.fieldValue,
+			user: {
+				findMany: (args: {
+					where: { id: { in: string[] } };
+					select: { id: true };
+				}) =>
+					tx.user.findMany({
+						where: {
+							...args.where,
+							members: { some: { organizationId: currentTenantId() } },
+						},
+						select: args.select,
+					}),
+			},
+		};
 	}
 
 	private translate(cause: unknown): never {

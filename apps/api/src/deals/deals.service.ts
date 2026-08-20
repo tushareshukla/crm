@@ -234,6 +234,8 @@ export class DealsService {
 	}
 
 	async create(input: DealCreateInput) {
+		await requireOwner(this.db, input.ownerId);
+
 		const stage = input.stage ?? "DEMO_BOOKED";
 		const closed = isClosedStage(stage);
 		const now = new Date();
@@ -300,6 +302,7 @@ export class DealsService {
 			data.company = { connect: { id: input.companyId } };
 		}
 		if (input.ownerId !== undefined) {
+			await requireOwner(this.db, input.ownerId);
 			data.owner = { connect: { id: input.ownerId } };
 		}
 		if (input.amountCents !== undefined) {

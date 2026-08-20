@@ -5,9 +5,9 @@ import {
 	tenantIdOrNull,
 } from "./tenant";
 import {
+	MODEL_RELATIONS,
 	TENANT_COMPOUND_UNIQUES,
 	TENANT_FK_SCALARS,
-	TENANT_LIST_RELATIONS,
 	TENANT_MODELS,
 	TENANT_RELATIONS,
 	type TenantModel,
@@ -185,10 +185,16 @@ function scopeNestedWrites(
 }
 
 /**
- * `include` / `select` of a list relation that points at a tenant model gets a
- * `where: { organizationId }` — this is what stops a read on a *global* model
- * (User, Organization) from pulling tenant rows across the boundary. Recurses
- * into nested include/select.
+ * Walk an `include` / `select` tree and pin every list relation that points at a
+ * tenant model with `where: { organizationId }` — this is what stops a read from
+ * pulling tenant rows across the boundary. The walk descends through EVERY
+ * relation field (to-one and list, global or tenant target) at any depth, so a
+ * path through a global model (Contact.owner→User→ownedContacts,
+ * Member.user→User→slackMemberMatch, …) is scoped like a direct one. To-one
+ * relations need no where-clause of their own: tenant→tenant FKs are pinned by
+ * the same-org triggers + compoundWhere, and a to-one to a global model carries
+ * no tenant rows itself. Cost is O(selection size): the relation graph is
+ * precomputed at generate time (MODEL_RELATIONS), never scanned per query.
  */
 function scopeSelection(
 	model: string,
@@ -196,15 +202,15 @@ function scopeSelection(
 	org: string,
 ): unknown {
 	if (!isObject(selection)) return selection;
-	const lists = TENANT_LIST_RELATIONS[model] ?? {};
-	const nested = model in TENANT ? TENANT_RELATIONS[model as TenantModel] : {};
+	const relations = MODEL_RELATIONS[model] ?? {};
 	const out: AnyRecord = { ...selection };
 	// `_count: { select: { <listRelation>: true | { where } } }` counts like the list does
 	if (isObject(out._count) && isObject(out._count.select)) {
 		const countSelect: AnyRecord = { ...out._count.select };
 		for (const [field, value] of Object.entries(countSelect)) {
-			const listTarget = lists[field];
-			if (!listTarget || value === false || value === undefined) continue;
+			const rel = relations[field];
+			if (!rel?.isList || !TENANT.has(rel.target)) continue;
+			if (value === false || value === undefined) continue;
 			const args: AnyRecord = isObject(value) ? { ...value } : {};
 			args.where = {
 				AND: [
@@ -218,11 +224,14 @@ function scopeSelection(
 	}
 	for (const [field, value] of Object.entries(out)) {
 		if (field === "_count") continue;
-		const listTarget = lists[field];
-		const target = listTarget ?? nested?.[field];
-		if (!target || value === false || value === undefined) continue;
+		const rel = relations[field];
+		if (!rel || value === false || value === undefined) continue;
+		const scopedList = rel.isList && TENANT.has(rel.target);
+		// `field: true` with nothing to pin needs no rewrite — and there is no
+		// nested selection to descend into.
+		if (!isObject(value) && !scopedList) continue;
 		const args: AnyRecord = isObject(value) ? { ...value } : {};
-		if (listTarget)
+		if (scopedList)
 			args.where = {
 				AND: [
 					{ organizationId: org },
@@ -230,9 +239,9 @@ function scopeSelection(
 				],
 			};
 		if ("include" in args)
-			args.include = scopeSelection(target, args.include, org);
+			args.include = scopeSelection(rel.target, args.include, org);
 		if ("select" in args)
-			args.select = scopeSelection(target, args.select, org);
+			args.select = scopeSelection(rel.target, args.select, org);
 		out[field] = args;
 	}
 	return out;
@@ -241,6 +250,53 @@ function scopeSelection(
 function scopeSelections(model: string, a: AnyRecord, org: string): void {
 	if ("include" in a) a.include = scopeSelection(model, a.include, org);
 	if ("select" in a) a.select = scopeSelection(model, a.select, org);
+}
+
+/**
+ * Fail closed: a global-root query executed with NO tenant context (and not in
+ * withoutTenant) must not reach tenant rows through its selection tree. Walks
+ * the actual include/select (O(selection size)) and throws the moment any
+ * relation path lands on a tenant model. Selections that stay on global models
+ * (Session→User, Member→Organization, …) pass — auth depends on that.
+ */
+function assertSelectionStaysGlobal(
+	model: string,
+	selection: unknown,
+	rootModel: string,
+	operation: string,
+): void {
+	if (!isObject(selection)) return;
+	const relations = MODEL_RELATIONS[model] ?? {};
+	if (isObject(selection._count) && isObject(selection._count.select)) {
+		for (const [field, value] of Object.entries(selection._count.select)) {
+			if (value === false || value === undefined) continue;
+			const rel = relations[field];
+			if (rel && TENANT.has(rel.target))
+				throw new TenantContextMissing(rootModel, operation);
+		}
+	}
+	for (const [field, value] of Object.entries(selection)) {
+		if (field === "_count" || value === false || value === undefined) continue;
+		const rel = relations[field];
+		if (!rel) continue;
+		if (TENANT.has(rel.target))
+			throw new TenantContextMissing(rootModel, operation);
+		if (!isObject(value)) continue;
+		if ("include" in value)
+			assertSelectionStaysGlobal(
+				rel.target,
+				value.include,
+				rootModel,
+				operation,
+			);
+		if ("select" in value)
+			assertSelectionStaysGlobal(
+				rel.target,
+				value.select,
+				rootModel,
+				operation,
+			);
+	}
 }
 
 /**
@@ -256,16 +312,18 @@ export const tenantScoping = Prisma.defineExtension({
 				const org = tenantIdOrNull();
 
 				if (!isTenantModel(model)) {
-					// Global model: only its selections of tenant lists need scoping — and only when a tenant is set.
-					if (
-						org &&
-						isObject(args) &&
-						("include" in args || "select" in args) &&
-						model in TENANT_LIST_RELATIONS
-					) {
+					// Global model: its selection tree may still reach tenant rows.
+					// With a tenant set, every such path is scoped; with none, a
+					// selection that reaches a tenant model throws (fail closed).
+					// Selection-free queries pass through — auth depends on that.
+					if (isObject(args) && ("include" in args || "select" in args)) {
 						const a: AnyRecord = { ...args };
-						scopeSelections(model, a, org);
-						return query(a as typeof args);
+						if (org) {
+							scopeSelections(model, a, org);
+							return query(a as typeof args);
+						}
+						assertSelectionStaysGlobal(model, a.include, model, operation);
+						assertSelectionStaysGlobal(model, a.select, model, operation);
 					}
 					return query(args);
 				}

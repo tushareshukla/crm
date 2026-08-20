@@ -4,7 +4,7 @@ import {
 	workspaceId,
 } from "@crm/auth";
 import type { Db, Prisma } from "@crm/db";
-import { currentTenantId } from "@crm/db";
+import { currentTenantId, withoutTenant } from "@crm/db";
 import { schemas } from "@crm/validation";
 import {
 	BadRequestException,
@@ -37,47 +37,61 @@ export class SlackConnectionService {
 
 	async status(userId: string) {
 		const role = await this.access.assertMember(userId);
-		const [account, agents, matches, memberCount, grant] = await Promise.all([
-			this.db.account.findFirst({
-				where: { providerId: "slack", accessToken: { not: null } },
-				orderBy: { updatedAt: "desc" },
-				select: { accountId: true, updatedAt: true, scope: true },
-			}),
-			this.db.agentDefinition.findMany({
-				where: {
-					status: { in: ["LIVE", "PAUSED"] },
-					deletedAt: null,
-					currentVersionId: { not: null },
-					currentVersion: {
-						manifest: {
-							path: ["dataScope", "resources"],
-							array_contains: [{ id: SLACK_WORKSPACE_RESOURCE_ID }],
+		const [account, agents, matches, memberCount, grant, installation] =
+			await Promise.all([
+				this.db.account.findFirst({
+					// Account is a global better-auth row: only a connection made by
+					// a member of this organization counts here.
+					where: {
+						providerId: "slack",
+						accessToken: { not: null },
+						user: { members: { some: { organizationId: workspaceId() } } },
+					},
+					orderBy: { updatedAt: "desc" },
+					select: { accountId: true, updatedAt: true, scope: true },
+				}),
+				this.db.agentDefinition.findMany({
+					where: {
+						status: { in: ["LIVE", "PAUSED"] },
+						deletedAt: null,
+						currentVersionId: { not: null },
+						currentVersion: {
+							manifest: {
+								path: ["dataScope", "resources"],
+								array_contains: [{ id: SLACK_WORKSPACE_RESOURCE_ID }],
+							},
 						},
 					},
-				},
-				orderBy: { updatedAt: "desc" },
-				take: 30,
-				select: { id: true, name: true, description: true, status: true },
-			}),
-			this.db.slackMemberMatch.findMany({
-				where: {
-					crmUser: { members: { some: { organizationId: workspaceId() } } },
-				},
-				select: { slackUserId: true, updatedAt: true },
-			}),
-			this.db.member.count({ where: { organizationId: workspaceId() } }),
-			this.db.slackWorkspaceGrant.findFirst({
-				select: { id: true, teamName: true },
-			}),
-		]);
+					orderBy: { updatedAt: "desc" },
+					take: 30,
+					select: { id: true, name: true, description: true, status: true },
+				}),
+				this.db.slackMemberMatch.findMany({
+					where: {
+						crmUser: { members: { some: { organizationId: workspaceId() } } },
+					},
+					select: { slackUserId: true, updatedAt: true },
+				}),
+				this.db.member.count({ where: { organizationId: workspaceId() } }),
+				this.db.slackWorkspaceGrant.findFirst({
+					select: { id: true, teamName: true },
+				}),
+				this.db.slackInstallation.findFirst({ select: { id: true } }),
+			]);
+
+		// Connected means connected *for this organization*: a member's Slack
+		// account plus this organization's own grant (or in-flight installation).
+		// A member's account alone is another organization's connection.
+		const connected = Boolean(account && (grant || installation));
 
 		const matched = matches.filter((match) => match.slackUserId).length;
 		const reviewed = matches.length;
 		const inventoryFresh =
+			connected &&
 			account &&
 			reviewed === memberCount &&
 			matches.every((match) => match.updatedAt >= account.updatedAt);
-		if (account && !inventoryFresh) {
+		if (connected && account && !inventoryFresh) {
 			await this.agent.slackPeopleRequested(
 				"Match workspace members to Slack accounts by exact email",
 			);
@@ -85,10 +99,11 @@ export class SlackConnectionService {
 
 		return {
 			configured: isSlackConfigured(),
-			connected: Boolean(account),
-			workspace: account ? (grant?.teamName ?? null) : null,
-			lastConnectedAt: account?.updatedAt.toISOString() ?? null,
-			scopes: (account?.scope ?? "")
+			connected,
+			workspace: connected ? (grant?.teamName ?? null) : null,
+			lastConnectedAt:
+				connected && account ? account.updatedAt.toISOString() : null,
+			scopes: (connected ? (account?.scope ?? "") : "")
 				.split(",")
 				.map((scope) => scope.trim())
 				.filter(Boolean),
@@ -161,12 +176,24 @@ export class SlackConnectionService {
 
 	async refreshPeople(userId: string) {
 		await this.access.assertMember(userId);
-		const account = await this.db.account.findFirst({
-			where: { providerId: "slack", accessToken: { not: null } },
-			orderBy: { updatedAt: "desc" },
-			select: { id: true },
-		});
-		if (!account) throw new NotFoundException("Slack is not connected.");
+		const [account, grant, installation] = await Promise.all([
+			this.db.account.findFirst({
+				// Account is a global better-auth row: only a connection made by a
+				// member of this organization counts here.
+				where: {
+					providerId: "slack",
+					accessToken: { not: null },
+					user: { members: { some: { organizationId: workspaceId() } } },
+				},
+				orderBy: { updatedAt: "desc" },
+				select: { id: true },
+			}),
+			this.db.slackWorkspaceGrant.findFirst({ select: { id: true } }),
+			this.db.slackInstallation.findFirst({ select: { id: true } }),
+		]);
+		if (!account || !(grant || installation)) {
+			throw new NotFoundException("Slack is not connected.");
+		}
 
 		await this.agent.slackPeopleRequested(
 			"Refresh Slack people and channels from the connection page",
@@ -283,13 +310,58 @@ export class SlackConnectionService {
 			);
 		}
 
+		const organizationId = currentTenantId();
+
 		const removed = await this.db.$transaction(async (tx) => {
-			const accounts = await tx.account.deleteMany({
-				where: { providerId: "slack" },
-			});
+			// This organization's Slack state only — tenant models, so the
+			// extension scopes every one of these to the current organization.
+			const [grants, installations] = await Promise.all([
+				tx.slackWorkspaceGrant.deleteMany({}),
+				tx.slackInstallation.deleteMany({}),
+			]);
 			await tx.slackChannel.deleteMany({});
-			await tx.slackWorkspaceGrant.deleteMany({});
-			return accounts.count;
+			await tx.slackMemberMatch.deleteMany({});
+
+			// Account is a global better-auth row, one per user: a member of this
+			// organization may also carry another organization's Slack connection.
+			const candidates = await tx.account.findMany({
+				where: {
+					providerId: "slack",
+					user: { members: { some: { organizationId } } },
+				},
+				select: { id: true, userId: true },
+			});
+
+			let accounts = 0;
+			for (const candidate of candidates) {
+				// Platform-level existence check: does any OTHER organization this
+				// user belongs to still have a Slack connection (grant, or an
+				// in-flight installation) that depends on their account? Those are
+				// other organizations' tenant rows, hence withoutTenant — reading
+				// them is exactly the point, and nothing is written across tenants.
+				const dependedOn = await withoutTenant(async () => {
+					const elsewhere = {
+						organizationId: { not: organizationId },
+						organization: { members: { some: { userId: candidate.userId } } },
+					};
+					const grant = await tx.slackWorkspaceGrant.findFirst({
+						where: elsewhere,
+						select: { id: true },
+					});
+					if (grant) return true;
+					const installation = await tx.slackInstallation.findFirst({
+						where: elsewhere,
+						select: { id: true },
+					});
+					return Boolean(installation);
+				});
+				if (dependedOn) continue;
+
+				await tx.account.delete({ where: { id: candidate.id } });
+				accounts += 1;
+			}
+
+			return grants.count + installations.count + accounts;
 		});
 
 		if (removed === 0) throw new NotFoundException("Slack is not connected.");

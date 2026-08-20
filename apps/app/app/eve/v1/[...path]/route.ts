@@ -1,10 +1,11 @@
-import { db, OrgStatus, runWithTenant } from "@crm/db";
+import { OrgStatus, runWithTenant } from "@crm/db";
 import { connection } from "next/server";
 import {
 	AGENT_URL,
 	bridgeConfigured,
 	mintBridgeToken,
 } from "@/lib/agent-bridge";
+import { bridgeRefused, sessionFromPath } from "@/lib/agent-bridge-guard";
 import { ORG_SLUG_HEADER } from "@/lib/org-slug";
 import {
 	organizationAccess,
@@ -85,37 +86,15 @@ async function handler(request: Request): Promise<Response> {
 	headers.delete("x-crm-builder-conversation");
 
 	// Conversations are tenant rows: read them inside the organization, so a
-	// session id from another organization is simply not found.
-	const refused = await runWithTenant(organization.id, async () => {
-		if (requestedSession) {
-			const conversation = await db.agentConversation.findUnique({
-				where: { sessionId: requestedSession },
-				select: { userId: true },
-			});
-			if (conversation && conversation.userId !== session.user.id) {
-				return true;
-			}
-		}
-
-		if (builderConversationId) {
-			const conversation = await db.agentConversation.findFirst({
-				where: {
-					id: builderConversationId,
-					userId: session.user.id,
-					kind: "BUILDER",
-				},
-				select: { sessionId: true },
-			});
-			if (
-				!conversation ||
-				(requestedSession && conversation.sessionId !== requestedSession)
-			) {
-				return true;
-			}
-		}
-
-		return false;
-	});
+	// session id from another organization is simply not found — and not found
+	// is refused, never allowed through.
+	const refused = await runWithTenant(organization.id, () =>
+		bridgeRefused({
+			userId: session.user.id,
+			requestedSession,
+			builderConversationId,
+		}),
+	);
 
 	if (refused) {
 		return Response.json({ error: "Conversation not found." }, { status: 404 });
@@ -193,9 +172,4 @@ export {
 
 function cuid(value: string | null): string | undefined {
 	return value && /^[a-z0-9]{20,32}$/.test(value) ? value : undefined;
-}
-
-function sessionFromPath(pathname: string): string | null {
-	const match = pathname.match(/\/eve\/v1\/session\/([^/]+)/);
-	return match?.[1] ? decodeURIComponent(match[1]) : null;
 }

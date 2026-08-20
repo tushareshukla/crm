@@ -12,7 +12,7 @@ import { ConversionService } from "../src/currency/conversion.service";
 import { FieldsService } from "../src/fields/fields.service";
 import { MailboxMatchService } from "../src/mailbox/mailbox-match.service";
 import { withDiscardedCrmEvents } from "./agent-trigger.stub";
-import { afterAll, beforeAll, it } from "./tenant";
+import { afterAll, beforeAll, it, memberOf } from "./tenant";
 
 const suffix = process.env.TEST_RUN_ID ?? "record-delete-spec";
 const domain = `delete-${suffix}.test`;
@@ -117,6 +117,7 @@ beforeAll(async () => {
 	await db.user.create({
 		data: { id: userId, name: "Test Rep", email: `${userId}@example.test` },
 	});
+	await memberOf(userId);
 });
 
 afterAll(clean);

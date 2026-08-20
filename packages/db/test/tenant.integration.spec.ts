@@ -795,3 +795,190 @@ describe("tenant extension — adversarial", () => {
 		expect(fromB).toBeNull();
 	});
 });
+
+/**
+ * Selections that pass through a to-one relation to a GLOBAL model (Member.user,
+ * Session.user, Contact.owner → User, Member.organization, …) and then select a
+ * tenant list must be scoped exactly like a direct list include — at any depth.
+ * And a global-root query with NO tenant context whose selection reaches a
+ * tenant model must throw (fail closed) unless it runs in withoutTenant.
+ */
+describe("tenant extension — selection through global to-one relations", () => {
+	const U = "user-global-path-test";
+
+	beforeAll(async () => {
+		await reset();
+		await withoutTenant(async () => {
+			await db.user.upsert({
+				where: { email: "global-path@tenant.test" },
+				create: {
+					id: U,
+					name: "Path",
+					email: "global-path@tenant.test",
+					emailVerified: true,
+					updatedAt: new Date(),
+				},
+				update: {},
+			});
+			for (const o of [A, B]) {
+				await db.member.create({
+					data: {
+						id: `member-${o.id}`,
+						organizationId: o.id,
+						userId: U,
+						createdAt: new Date(),
+					},
+				});
+			}
+			await db.session.create({
+				data: {
+					id: `session-${U}`,
+					token: `token-${U}`,
+					expiresAt: new Date(Date.now() + 3_600_000),
+					userId: U,
+				},
+			});
+		});
+		for (const o of [A, B]) {
+			await runWithTenant(o.id, async () => {
+				await db.slackMemberMatch.create({
+					data: { crmUserId: U, slackHandle: `handle-${o.slug}` },
+				});
+				await db.company.create({
+					data: { name: `Owned ${o.slug}`, ownerId: U },
+				});
+				await db.contact.create({
+					data: { firstName: `Contact ${o.slug}`, ownerId: U },
+				});
+			});
+		}
+	});
+
+	afterAll(async () => {
+		await withoutTenant(() => db.user.delete({ where: { id: U } }));
+	});
+
+	test("member → user → slackMemberMatch only returns the current org's rows", async () => {
+		const members = await runWithTenant(A.id, () =>
+			db.member.findMany({
+				where: { userId: U },
+				select: { user: { select: { slackMemberMatch: true } } },
+			}),
+		);
+		// the membership list itself is global (both orgs), but every tenant row
+		// reached through it belongs to the current org — B's match never appears
+		expect(members.length).toBe(2);
+		for (const member of members) {
+			expect(member.user.slackMemberMatch.length).toBe(1);
+			expect(member.user.slackMemberMatch[0]?.organizationId).toBe(A.id);
+		}
+	});
+
+	test("company → owner → ownedCompanies only returns the current org's rows", async () => {
+		const company = await runWithTenant(A.id, () =>
+			db.company.findFirst({
+				where: { name: "Owned tenant-a" },
+				select: { owner: { select: { ownedCompanies: true } } },
+			}),
+		);
+		expect(company?.owner?.ownedCompanies.map((c) => c.name)).toEqual([
+			"Owned tenant-a",
+		]);
+	});
+
+	test("session → user → ownedContacts only returns the current org's rows", async () => {
+		const session = await runWithTenant(B.id, () =>
+			db.session.findFirst({
+				where: { userId: U },
+				select: { user: { select: { ownedContacts: true } } },
+			}),
+		);
+		expect(session?.user.ownedContacts.map((c) => c.firstName)).toEqual([
+			"Contact tenant-b",
+		]);
+	});
+
+	test("member → user → members → organization → companies stays scoped through the whole chain", async () => {
+		const member = await runWithTenant(A.id, () =>
+			db.member.findFirst({
+				where: { userId: U, organizationId: A.id },
+				select: {
+					user: {
+						select: {
+							members: {
+								select: { organization: { select: { companies: true } } },
+							},
+						},
+					},
+				},
+			}),
+		);
+		const companies =
+			member?.user.members.flatMap((m) => m.organization.companies) ?? [];
+		expect(companies.length).toBe(1);
+		expect(companies.every((c) => c.organizationId === A.id)).toBe(true);
+	});
+
+	test("no context: a global-root selection reaching a tenant model throws, fail closed", async () => {
+		await expect(
+			(async () =>
+				db.user.findUnique({
+					where: { id: U },
+					select: { ownedContacts: true },
+				}))(),
+		).rejects.toBeInstanceOf(TenantContextMissing);
+		// …at depth too
+		await expect(
+			(async () =>
+				db.session.findFirst({
+					where: { userId: U },
+					select: { user: { select: { ownedContacts: true } } },
+				}))(),
+		).rejects.toBeInstanceOf(TenantContextMissing);
+		// _count of a tenant list is tenant data as well
+		await expect(
+			(async () =>
+				db.user.findUnique({
+					where: { id: U },
+					select: { _count: { select: { ownedContacts: true } } },
+				}))(),
+		).rejects.toBeInstanceOf(TenantContextMissing);
+	});
+
+	test("no context: global-only selections keep working (auth path)", async () => {
+		const session = await db.session.findFirst({
+			where: { userId: U },
+			include: { user: true },
+		});
+		expect(session?.user.id).toBe(U);
+		const user = await db.user.findUnique({
+			where: { id: U },
+			select: { members: { select: { organization: true } } },
+		});
+		expect(user?.members.length).toBe(2);
+	});
+
+	test("withoutTenant: the same tenant-reaching selection sees every org, explicitly", async () => {
+		const user = await withoutTenant(() =>
+			db.user.findUnique({
+				where: { id: U },
+				select: { ownedContacts: true },
+			}),
+		);
+		expect(new Set(user?.ownedContacts.map((c) => c.organizationId))).toEqual(
+			new Set([A.id, B.id]),
+		);
+	});
+
+	test("_count reached through a global to-one relation is scoped", async () => {
+		const member = await runWithTenant(A.id, () =>
+			db.member.findFirst({
+				where: { userId: U, organizationId: A.id },
+				select: {
+					user: { select: { _count: { select: { ownedContacts: true } } } },
+				},
+			}),
+		);
+		expect(member?.user._count.ownedContacts).toBe(1);
+	});
+});

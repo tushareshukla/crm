@@ -382,6 +382,1111 @@ export const TENANT_LIST_RELATIONS: Record<
 		auditEvents: "AuditEvent",
 	},
 } as never;
+/** relation field -> { target model, isList }, for EVERY model — the full relation graph. */
+export type RelationEntry = {
+	readonly target: string;
+	readonly isList: boolean;
+};
+export const MODEL_RELATIONS: Record<string, Record<string, RelationEntry>> = {
+	User: {
+		sessions: {
+			target: "Session",
+			isList: true,
+		},
+		accounts: {
+			target: "Account",
+			isList: true,
+		},
+		ownedCompanies: {
+			target: "Company",
+			isList: true,
+		},
+		ownedContacts: {
+			target: "Contact",
+			isList: true,
+		},
+		ownedDeals: {
+			target: "Deal",
+			isList: true,
+		},
+		activities: {
+			target: "Activity",
+			isList: true,
+		},
+		mailboxSyncs: {
+			target: "MailboxSync",
+			isList: true,
+		},
+		factDecisions: {
+			target: "ContactFact",
+			isList: true,
+		},
+		conversations: {
+			target: "AgentConversation",
+			isList: true,
+		},
+		fieldValues: {
+			target: "FieldValue",
+			isList: true,
+		},
+		createdAgentDefinitions: {
+			target: "AgentDefinition",
+			isList: true,
+		},
+		createdAgentVersions: {
+			target: "AgentVersion",
+			isList: true,
+		},
+		createdAgentTriggers: {
+			target: "AgentTrigger",
+			isList: true,
+		},
+		initiatedAgentRuns: {
+			target: "AgentRun",
+			isList: true,
+		},
+		agentAuditEvents: {
+			target: "AgentAuditEvent",
+			isList: true,
+		},
+		conversationShares: {
+			target: "AgentConversationShare",
+			isList: true,
+		},
+		conversationSubmissions: {
+			target: "AgentConversationSubmission",
+			isList: true,
+		},
+		conversationFeedback: {
+			target: "AgentConversationFeedback",
+			isList: true,
+		},
+		slackMemberMatch: {
+			target: "SlackMemberMatch",
+			isList: true,
+		},
+		members: {
+			target: "Member",
+			isList: true,
+		},
+		invitations: {
+			target: "Invitation",
+			isList: true,
+		},
+		ssoproviders: {
+			target: "SsoProvider",
+			isList: true,
+		},
+		auditEvents: {
+			target: "AuditEvent",
+			isList: true,
+		},
+	},
+	SlackMemberMatch: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		crmUser: {
+			target: "User",
+			isList: false,
+		},
+	},
+	SlackChannel: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+	},
+	SlackInstallation: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+	},
+	SlackWorkspaceGrant: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+	},
+	Session: {
+		user: {
+			target: "User",
+			isList: false,
+		},
+	},
+	Account: {
+		user: {
+			target: "User",
+			isList: false,
+		},
+	},
+	Company: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		owner: {
+			target: "User",
+			isList: false,
+		},
+		primaryContact: {
+			target: "Contact",
+			isList: false,
+		},
+		enrichment: {
+			target: "CompanyEnrichment",
+			isList: false,
+		},
+		contacts: {
+			target: "Contact",
+			isList: true,
+		},
+		conversations: {
+			target: "AgentConversation",
+			isList: true,
+		},
+		deals: {
+			target: "Deal",
+			isList: true,
+		},
+		activities: {
+			target: "Activity",
+			isList: true,
+		},
+		emailThreads: {
+			target: "EmailThread",
+			isList: true,
+		},
+		calendarEvents: {
+			target: "CalendarEvent",
+			isList: true,
+		},
+		fieldValues: {
+			target: "FieldValue",
+			isList: true,
+		},
+	},
+	CompanyEnrichment: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		company: {
+			target: "Company",
+			isList: false,
+		},
+	},
+	Contact: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		brief: {
+			target: "ContactBrief",
+			isList: false,
+		},
+		facts: {
+			target: "ContactFact",
+			isList: true,
+		},
+		conversations: {
+			target: "AgentConversation",
+			isList: true,
+		},
+		company: {
+			target: "Company",
+			isList: false,
+		},
+		owner: {
+			target: "User",
+			isList: false,
+		},
+		primaryOf: {
+			target: "Company",
+			isList: false,
+		},
+		deals: {
+			target: "DealContact",
+			isList: true,
+		},
+		activities: {
+			target: "Activity",
+			isList: true,
+		},
+		emailThreads: {
+			target: "EmailThread",
+			isList: true,
+		},
+		calendarEvents: {
+			target: "CalendarEvent",
+			isList: true,
+		},
+		eventAttendance: {
+			target: "CalendarAttendee",
+			isList: true,
+		},
+		fieldValues: {
+			target: "FieldValue",
+			isList: true,
+		},
+		visitors: {
+			target: "TrackedVisitor",
+			isList: true,
+		},
+		submissions: {
+			target: "FormSubmission",
+			isList: true,
+		},
+	},
+	ContactFact: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		contact: {
+			target: "Contact",
+			isList: false,
+		},
+		decidedBy: {
+			target: "User",
+			isList: false,
+		},
+	},
+	ContactBrief: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		contact: {
+			target: "Contact",
+			isList: false,
+		},
+	},
+	AgentTask: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+	},
+	AgentEvent: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		conversation: {
+			target: "AgentConversation",
+			isList: false,
+		},
+	},
+	AgentConversation: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		contact: {
+			target: "Contact",
+			isList: false,
+		},
+		company: {
+			target: "Company",
+			isList: false,
+		},
+		deal: {
+			target: "Deal",
+			isList: false,
+		},
+		user: {
+			target: "User",
+			isList: false,
+		},
+		agent: {
+			target: "AgentDefinition",
+			isList: false,
+		},
+		shares: {
+			target: "AgentConversationShare",
+			isList: true,
+		},
+		submissions: {
+			target: "AgentConversationSubmission",
+			isList: true,
+		},
+		feedback: {
+			target: "AgentConversationFeedback",
+			isList: true,
+		},
+		events: {
+			target: "AgentEvent",
+			isList: true,
+		},
+		createdVersions: {
+			target: "AgentVersion",
+			isList: true,
+		},
+		builderArtifacts: {
+			target: "AgentBuilderArtifact",
+			isList: true,
+		},
+	},
+	AgentConversationFeedback: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		conversation: {
+			target: "AgentConversation",
+			isList: false,
+		},
+		user: {
+			target: "User",
+			isList: false,
+		},
+	},
+	AgentConversationShare: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		conversation: {
+			target: "AgentConversation",
+			isList: false,
+		},
+		createdBy: {
+			target: "User",
+			isList: false,
+		},
+	},
+	AgentConversationSubmission: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		conversation: {
+			target: "AgentConversation",
+			isList: false,
+		},
+		submittedBy: {
+			target: "User",
+			isList: false,
+		},
+		attachments: {
+			target: "AgentConversationAttachment",
+			isList: true,
+		},
+	},
+	AgentConversationAttachment: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		submission: {
+			target: "AgentConversationSubmission",
+			isList: false,
+		},
+	},
+	AgentDefinition: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		createdBy: {
+			target: "User",
+			isList: false,
+		},
+		currentVersion: {
+			target: "AgentVersion",
+			isList: false,
+		},
+		versions: {
+			target: "AgentVersion",
+			isList: true,
+		},
+		triggers: {
+			target: "AgentTrigger",
+			isList: true,
+		},
+		runs: {
+			target: "AgentRun",
+			isList: true,
+		},
+		actions: {
+			target: "AgentAction",
+			isList: true,
+		},
+		auditEvents: {
+			target: "AgentAuditEvent",
+			isList: true,
+		},
+		conversations: {
+			target: "AgentConversation",
+			isList: true,
+		},
+	},
+	AgentVersion: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		agent: {
+			target: "AgentDefinition",
+			isList: false,
+		},
+		sourceConversation: {
+			target: "AgentConversation",
+			isList: false,
+		},
+		createdBy: {
+			target: "User",
+			isList: false,
+		},
+		currentFor: {
+			target: "AgentDefinition",
+			isList: false,
+		},
+		triggers: {
+			target: "AgentTrigger",
+			isList: true,
+		},
+		runs: {
+			target: "AgentRun",
+			isList: true,
+		},
+		auditEvents: {
+			target: "AgentAuditEvent",
+			isList: true,
+		},
+		builderArtifacts: {
+			target: "AgentBuilderArtifact",
+			isList: true,
+		},
+	},
+	AgentBuilderArtifact: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		conversation: {
+			target: "AgentConversation",
+			isList: false,
+		},
+		version: {
+			target: "AgentVersion",
+			isList: false,
+		},
+	},
+	AgentTrigger: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		agent: {
+			target: "AgentDefinition",
+			isList: false,
+		},
+		version: {
+			target: "AgentVersion",
+			isList: false,
+		},
+		createdBy: {
+			target: "User",
+			isList: false,
+		},
+		runs: {
+			target: "AgentRun",
+			isList: true,
+		},
+	},
+	AgentRun: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		agent: {
+			target: "AgentDefinition",
+			isList: false,
+		},
+		version: {
+			target: "AgentVersion",
+			isList: false,
+		},
+		trigger: {
+			target: "AgentTrigger",
+			isList: false,
+		},
+		initiatedBy: {
+			target: "User",
+			isList: false,
+		},
+		events: {
+			target: "AgentRunEvent",
+			isList: true,
+		},
+		actions: {
+			target: "AgentAction",
+			isList: true,
+		},
+	},
+	AgentRunEvent: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		run: {
+			target: "AgentRun",
+			isList: false,
+		},
+	},
+	AgentAction: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		agent: {
+			target: "AgentDefinition",
+			isList: false,
+		},
+		run: {
+			target: "AgentRun",
+			isList: false,
+		},
+	},
+	AgentAuditEvent: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		agent: {
+			target: "AgentDefinition",
+			isList: false,
+		},
+		version: {
+			target: "AgentVersion",
+			isList: false,
+		},
+		actorUser: {
+			target: "User",
+			isList: false,
+		},
+	},
+	Deal: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		conversations: {
+			target: "AgentConversation",
+			isList: true,
+		},
+		company: {
+			target: "Company",
+			isList: false,
+		},
+		owner: {
+			target: "User",
+			isList: false,
+		},
+		contacts: {
+			target: "DealContact",
+			isList: true,
+		},
+		activities: {
+			target: "Activity",
+			isList: true,
+		},
+		fieldValues: {
+			target: "FieldValue",
+			isList: true,
+		},
+	},
+	DealContact: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		deal: {
+			target: "Deal",
+			isList: false,
+		},
+		contact: {
+			target: "Contact",
+			isList: false,
+		},
+	},
+	FieldDefinition: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		options: {
+			target: "FieldOption",
+			isList: true,
+		},
+		values: {
+			target: "FieldValue",
+			isList: true,
+		},
+	},
+	FieldOption: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		field: {
+			target: "FieldDefinition",
+			isList: false,
+		},
+		values: {
+			target: "FieldValue",
+			isList: true,
+		},
+	},
+	FieldValue: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		field: {
+			target: "FieldDefinition",
+			isList: false,
+		},
+		company: {
+			target: "Company",
+			isList: false,
+		},
+		contact: {
+			target: "Contact",
+			isList: false,
+		},
+		deal: {
+			target: "Deal",
+			isList: false,
+		},
+		option: {
+			target: "FieldOption",
+			isList: false,
+		},
+		user: {
+			target: "User",
+			isList: false,
+		},
+	},
+	Activity: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		company: {
+			target: "Company",
+			isList: false,
+		},
+		contact: {
+			target: "Contact",
+			isList: false,
+		},
+		deal: {
+			target: "Deal",
+			isList: false,
+		},
+		createdBy: {
+			target: "User",
+			isList: false,
+		},
+		emailThread: {
+			target: "EmailThread",
+			isList: false,
+		},
+		calendarEvent: {
+			target: "CalendarEvent",
+			isList: false,
+		},
+	},
+	MailboxSync: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		user: {
+			target: "User",
+			isList: false,
+		},
+	},
+	EmailThread: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		company: {
+			target: "Company",
+			isList: false,
+		},
+		contact: {
+			target: "Contact",
+			isList: false,
+		},
+		messages: {
+			target: "EmailMessage",
+			isList: true,
+		},
+		activity: {
+			target: "Activity",
+			isList: false,
+		},
+	},
+	EmailMessage: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		thread: {
+			target: "EmailThread",
+			isList: false,
+		},
+	},
+	CalendarEvent: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		company: {
+			target: "Company",
+			isList: false,
+		},
+		contact: {
+			target: "Contact",
+			isList: false,
+		},
+		attendees: {
+			target: "CalendarAttendee",
+			isList: true,
+		},
+		activity: {
+			target: "Activity",
+			isList: false,
+		},
+	},
+	CalendarAttendee: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		event: {
+			target: "CalendarEvent",
+			isList: false,
+		},
+		contact: {
+			target: "Contact",
+			isList: false,
+		},
+	},
+	SuppressedDomain: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+	},
+	SuppressedContact: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+	},
+	AppSetting: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+	},
+	TrackedDomain: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+	},
+	TrackedVisitor: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		contact: {
+			target: "Contact",
+			isList: false,
+		},
+	},
+	TrackedEvent: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+	},
+	TrackingCounter: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+	},
+	TrackedPageDaily: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+	},
+	FormSubmission: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		contact: {
+			target: "Contact",
+			isList: false,
+		},
+	},
+	Organization: {
+		members: {
+			target: "Member",
+			isList: true,
+		},
+		invitations: {
+			target: "Invitation",
+			isList: true,
+		},
+		ssoProviders: {
+			target: "SsoProvider",
+			isList: true,
+		},
+		companies: {
+			target: "Company",
+			isList: true,
+		},
+		companyEnrichments: {
+			target: "CompanyEnrichment",
+			isList: true,
+		},
+		contacts: {
+			target: "Contact",
+			isList: true,
+		},
+		contactFacts: {
+			target: "ContactFact",
+			isList: true,
+		},
+		contactBriefs: {
+			target: "ContactBrief",
+			isList: true,
+		},
+		agentTasks: {
+			target: "AgentTask",
+			isList: true,
+		},
+		agentEvents: {
+			target: "AgentEvent",
+			isList: true,
+		},
+		agentConversations: {
+			target: "AgentConversation",
+			isList: true,
+		},
+		agentConversationFeedbacks: {
+			target: "AgentConversationFeedback",
+			isList: true,
+		},
+		agentConversationShares: {
+			target: "AgentConversationShare",
+			isList: true,
+		},
+		agentConversationSubmissions: {
+			target: "AgentConversationSubmission",
+			isList: true,
+		},
+		agentConversationAttachments: {
+			target: "AgentConversationAttachment",
+			isList: true,
+		},
+		agentDefinitions: {
+			target: "AgentDefinition",
+			isList: true,
+		},
+		agentVersions: {
+			target: "AgentVersion",
+			isList: true,
+		},
+		agentBuilderArtifacts: {
+			target: "AgentBuilderArtifact",
+			isList: true,
+		},
+		agentTriggers: {
+			target: "AgentTrigger",
+			isList: true,
+		},
+		agentRuns: {
+			target: "AgentRun",
+			isList: true,
+		},
+		agentRunEvents: {
+			target: "AgentRunEvent",
+			isList: true,
+		},
+		agentActions: {
+			target: "AgentAction",
+			isList: true,
+		},
+		agentAuditEvents: {
+			target: "AgentAuditEvent",
+			isList: true,
+		},
+		deals: {
+			target: "Deal",
+			isList: true,
+		},
+		dealContacts: {
+			target: "DealContact",
+			isList: true,
+		},
+		fieldDefinitions: {
+			target: "FieldDefinition",
+			isList: true,
+		},
+		fieldOptions: {
+			target: "FieldOption",
+			isList: true,
+		},
+		fieldValues: {
+			target: "FieldValue",
+			isList: true,
+		},
+		activities: {
+			target: "Activity",
+			isList: true,
+		},
+		mailboxSyncs: {
+			target: "MailboxSync",
+			isList: true,
+		},
+		emailThreads: {
+			target: "EmailThread",
+			isList: true,
+		},
+		emailMessages: {
+			target: "EmailMessage",
+			isList: true,
+		},
+		calendarEvents: {
+			target: "CalendarEvent",
+			isList: true,
+		},
+		calendarAttendees: {
+			target: "CalendarAttendee",
+			isList: true,
+		},
+		suppressedDomains: {
+			target: "SuppressedDomain",
+			isList: true,
+		},
+		suppressedContacts: {
+			target: "SuppressedContact",
+			isList: true,
+		},
+		appSettings: {
+			target: "AppSetting",
+			isList: true,
+		},
+		workspaceProfiles: {
+			target: "WorkspaceProfile",
+			isList: true,
+		},
+		trackedDomains: {
+			target: "TrackedDomain",
+			isList: true,
+		},
+		trackedVisitors: {
+			target: "TrackedVisitor",
+			isList: true,
+		},
+		trackedEvents: {
+			target: "TrackedEvent",
+			isList: true,
+		},
+		trackingCounters: {
+			target: "TrackingCounter",
+			isList: true,
+		},
+		trackedPageDailies: {
+			target: "TrackedPageDaily",
+			isList: true,
+		},
+		formSubmissions: {
+			target: "FormSubmission",
+			isList: true,
+		},
+		slackInstallations: {
+			target: "SlackInstallation",
+			isList: true,
+		},
+		slackChannels: {
+			target: "SlackChannel",
+			isList: true,
+		},
+		slackMemberMatches: {
+			target: "SlackMemberMatch",
+			isList: true,
+		},
+		slackWorkspaceGrants: {
+			target: "SlackWorkspaceGrant",
+			isList: true,
+		},
+		auditEvents: {
+			target: "AuditEvent",
+			isList: true,
+		},
+	},
+	WorkspaceProfile: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+	},
+	Member: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		user: {
+			target: "User",
+			isList: false,
+		},
+	},
+	Invitation: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		user: {
+			target: "User",
+			isList: false,
+		},
+	},
+	SsoProvider: {
+		user: {
+			target: "User",
+			isList: false,
+		},
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+	},
+	AuditEvent: {
+		organization: {
+			target: "Organization",
+			isList: false,
+		},
+		actor: {
+			target: "User",
+			isList: false,
+		},
+	},
+} as never;
 /** FK scalar fields per tenant model (presence ⇒ unchecked create input). */
 export const TENANT_FK_SCALARS: Record<TenantModel, readonly string[]> = {
 	Activity: [

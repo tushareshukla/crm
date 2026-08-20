@@ -639,7 +639,11 @@ async function connectionStatus(userId: string) {
 					select: {
 						name: true,
 						email: true,
+						// One match per (organization, user); a user in several
+						// organizations has one row each, so name this one.
 						slackMemberMatch: {
+							where: { organizationId: workspaceId() },
+							take: 1,
 							select: {
 								slackUserId: true,
 								slackHandle: true,

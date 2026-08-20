@@ -2,12 +2,22 @@ import { describe, expect } from "bun:test";
 import { db } from "@crm/db";
 import { persistBuilderInputRequest } from "../agent/lib/builder-input";
 import {
+	builderContext,
 	saveBuilderDraft,
 	writeBuilderArtifact,
 } from "../agent/lib/builder-runtime";
 import { setBuilderConversationTitle } from "../agent/lib/conversation-title";
 import { builderToken } from "../agent/lib/custom-agent-dispatch";
-import { afterAll, beforeAll, it } from "./support/tenant";
+import {
+	afterAll,
+	beforeAll,
+	ensureMember,
+	ensureOrganization,
+	inOrganization,
+	it,
+	OTHER_ORGANIZATION,
+	TEST_ORGANIZATION,
+} from "./support/tenant";
 
 const suffix = crypto.randomUUID();
 const userId = `builder-runtime-user-${suffix}`;
@@ -71,6 +81,12 @@ afterAll(async () => {
 	await db.agentConversation.deleteMany({
 		where: { id: { in: conversationIds } },
 	});
+	await inOrganization(
+		() => db.slackMemberMatch.deleteMany({ where: { crmUserId: userId } }),
+		OTHER_ORGANIZATION.id,
+	);
+	await db.slackMemberMatch.deleteMany({ where: { crmUserId: userId } });
+	await db.member.deleteMany({ where: { userId } });
 	await db.user.deleteMany({ where: { id: userId } });
 });
 
@@ -628,5 +644,42 @@ describe("builder persistence", () => {
 				where: { conversationId: conversation.id, status: "WRITING" },
 			}),
 		).toBe(0);
+	});
+});
+
+describe("connection status tenancy", () => {
+	it("keeps another organization's Slack member match out of the builder's people", async () => {
+		await ensureMember(userId, TEST_ORGANIZATION.id);
+		await ensureOrganization(OTHER_ORGANIZATION);
+		await inOrganization(
+			() =>
+				db.slackMemberMatch.create({
+					data: {
+						crmUserId: userId,
+						slackUserId: "U_FOREIGN",
+						slackHandle: "@foreign",
+						slackEmail: "foreign@example.test",
+					},
+				}),
+			OTHER_ORGANIZATION.id,
+		);
+
+		const before = await builderContext(conversationId, userId);
+		expect(before.availableConnections.slackPeople).toEqual([]);
+
+		// The organization's own match still surfaces.
+		await db.slackMemberMatch.create({
+			data: {
+				crmUserId: userId,
+				slackUserId: "U_OWN",
+				slackHandle: "@own",
+				slackEmail: "own@example.test",
+			},
+		});
+
+		const after = await builderContext(conversationId, userId);
+		expect(
+			after.availableConnections.slackPeople.map((person) => person.id),
+		).toEqual(["U_OWN"]);
 	});
 });

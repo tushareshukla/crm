@@ -11,7 +11,15 @@ import { ConversionService } from "../src/currency/conversion.service";
 import { DealsService } from "../src/deals/deals.service";
 import { FieldsService } from "../src/fields/fields.service";
 import { withDiscardedCrmEvents } from "./agent-trigger.stub";
-import { afterAll, beforeAll, beforeEach, it } from "./tenant";
+import {
+	afterAll,
+	beforeAll,
+	beforeEach,
+	createTestOrganization,
+	deleteTestOrganization,
+	it,
+	memberOf,
+} from "./tenant";
 
 const suffix = process.env.TEST_RUN_ID ?? "fields-spec";
 const domain = `fields-${suffix}.test`;
@@ -96,6 +104,7 @@ beforeAll(async () => {
 	await db.user.create({
 		data: { id: ownerId, name: "Fields Rep", email: `rep@${domain}` },
 	});
+	await memberOf(ownerId);
 
 	companyId = await makeCompany("fields-co");
 });
@@ -382,6 +391,47 @@ describe("field values", () => {
 				(field) => field.key === "spec_champion",
 			)?.value,
 		).toBe(ownerId);
+	});
+
+	it("refuses a platform user who works in another organization only", async () => {
+		const other = await createTestOrganization(`fields-other-${suffix}`);
+		const foreignId = `fields-foreign-${suffix}`;
+		await db.user.create({
+			data: { id: foreignId, name: "Foreign Rep", email: `foreign@${domain}` },
+		});
+		await memberOf(foreignId, other.id);
+
+		const record = await makeCompany("foreign-people");
+
+		await fields.create({
+			entity: "COMPANY",
+			label: "Spec sponsor",
+			type: "USER",
+			options: [],
+			agentFilled: false,
+			agentBrief: null,
+			required: false,
+			showOnSheet: true,
+			showOnTable: false,
+		});
+
+		try {
+			let refused: Error | null = null;
+			try {
+				await fields.applyValues(db, "COMPANY", record, {
+					spec_sponsor: foreignId,
+				});
+			} catch (cause) {
+				refused = cause as Error;
+			}
+			expect(refused?.message).toMatch(/works here/);
+			expect(await db.fieldValue.count({ where: { companyId: record } })).toBe(
+				0,
+			);
+		} finally {
+			await deleteTestOrganization(other);
+			await db.user.deleteMany({ where: { id: foreignId } });
+		}
 	});
 
 	it("clears a value when it is blanked", async () => {

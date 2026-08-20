@@ -6,7 +6,7 @@ import { ConversionService } from "../src/currency/conversion.service";
 import { DealsService } from "../src/deals/deals.service";
 import { FieldsService } from "../src/fields/fields.service";
 import { withDiscardedCrmEvents } from "./agent-trigger.stub";
-import { afterAll, beforeAll, it } from "./tenant";
+import { afterAll, beforeAll, it, memberOf } from "./tenant";
 
 const suffix = process.env.TEST_RUN_ID ?? "deal-contacts-spec";
 const userId = `user-${suffix}`;
@@ -53,6 +53,7 @@ beforeAll(async () => {
 			emailVerified: true,
 		},
 	});
+	await memberOf(userId);
 
 	const company = await db.company.create({
 		data: { name: `People Co ${suffix}`, domain },

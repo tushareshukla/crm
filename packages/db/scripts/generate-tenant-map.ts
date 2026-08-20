@@ -3,6 +3,8 @@
  *  - which models carry `organizationId` (tenant models), minus the auth-managed ones
  *  - for each tenant model, its relation fields that point at other tenant models
  *    (so nested create/connect payloads can be scoped too)
+ *  - for EVERY model, every relation field -> { target model, isList } (so selection
+ *    scoping can walk any include/select tree, including through global models)
  *  - the compound unique keys that include organizationId (for findUnique rewrites)
  * Run: bun scripts/generate-tenant-map.ts   (also wired into `db:generate`)
  */
@@ -88,11 +90,22 @@ for (const name of tenantModels) {
 const relations: Record<string, Record<string, string>> = {};
 // every model (tenant or not): list relations that point at tenant models — include/select on these must be scoped
 const listRelations: Record<string, Record<string, string>> = {};
+// every model: EVERY relation field (list or to-one, tenant or global target) — the
+// full graph the selection scoper walks so no include/select path escapes the tenant
+const modelRelations: Record<
+	string,
+	Record<string, { target: string; isList: boolean }>
+> = {};
 for (const m of models.values()) {
 	const rel: Record<string, string> = {};
-	for (const f of m.fields)
+	const all: Record<string, { target: string; isList: boolean }> = {};
+	for (const f of m.fields) {
+		if (!models.has(f.type)) continue;
+		all[f.name] = { target: f.type, isList: f.list };
 		if (f.list && tenantSet.has(f.type)) rel[f.name] = f.type;
+	}
 	if (Object.keys(rel).length > 0) listRelations[m.name] = rel;
+	if (Object.keys(all).length > 0) modelRelations[m.name] = all;
 }
 const compoundUniques: Record<string, string[][]> = {};
 for (const name of tenantModels) {
@@ -114,6 +127,9 @@ export type TenantModel = (typeof TENANT_MODELS)[number];
 export const TENANT_RELATIONS: Record<TenantModel, Record<string, TenantModel>> = ${JSON.stringify(relations, null, 1)} as never;
 /** list relation field -> tenant model, for EVERY model that has one (include/select scoping). */
 export const TENANT_LIST_RELATIONS: Record<string, Record<string, TenantModel>> = ${JSON.stringify(listRelations, null, 1)} as never;
+/** relation field -> { target model, isList }, for EVERY model — the full relation graph. */
+export type RelationEntry = { readonly target: string; readonly isList: boolean };
+export const MODEL_RELATIONS: Record<string, Record<string, RelationEntry>> = ${JSON.stringify(modelRelations, null, 1)} as never;
 /** FK scalar fields per tenant model (presence ⇒ unchecked create input). */
 export const TENANT_FK_SCALARS: Record<TenantModel, readonly string[]> = ${JSON.stringify(fkScalars, null, 1)} as never;
 /** compound unique keys that include organizationId, per tenant model. */

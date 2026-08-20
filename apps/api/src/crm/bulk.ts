@@ -1,4 +1,4 @@
-import type { Db } from "@crm/db";
+import { currentTenantId, type Db } from "@crm/db";
 import { BadRequestException } from "@nestjs/common";
 import { z } from "zod";
 
@@ -20,16 +20,18 @@ export type BulkResult = {
 
 export async function requireOwner(
 	db: Db,
-	ownerId: string | null,
+	ownerId: string | null | undefined,
 ): Promise<void> {
 	if (!ownerId) return;
 
-	const owner = await db.user.findUnique({
-		where: { id: ownerId },
+	// User and Member are global models: an id names a valid owner only when
+	// that user is a member of the current organization.
+	const member = await db.member.findFirst({
+		where: { organizationId: currentTenantId(), userId: ownerId },
 		select: { id: true },
 	});
 
-	if (!owner) {
+	if (!member) {
 		throw new BadRequestException("That owner does not work here any more.");
 	}
 }

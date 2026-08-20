@@ -7,7 +7,15 @@ import {
 	conversationSaveInput,
 } from "../src/conversations/conversations.contracts";
 import { ConversationsService } from "../src/conversations/conversations.service";
-import { afterAll, beforeAll, it, TEST_ORG } from "./tenant";
+import {
+	afterAll,
+	beforeAll,
+	createTestOrganization,
+	deleteTestOrganization,
+	it,
+	memberOf,
+	TEST_ORG,
+} from "./tenant";
 
 const record = z.record(z.string(), z.unknown()).catch({});
 
@@ -840,5 +848,76 @@ describe("ConversationsService", () => {
 				},
 			}),
 		).toBe(1);
+	});
+});
+
+describe("the builder's Slack resource", () => {
+	const foreignId = `slack-foreign-${suffix}`;
+
+	async function cleanSlack() {
+		await deleteTestOrganization({ id: `org-conv-other-${suffix}` });
+		await db.user.deleteMany({ where: { id: foreignId } });
+		await db.account.deleteMany({
+			where: { id: { in: [`acc-foreign-${suffix}`, `acc-ours-${suffix}`] } },
+		});
+		await db.slackWorkspaceGrant.deleteMany({
+			where: { teamId: `T-${suffix}` },
+		});
+	}
+
+	afterAll(cleanSlack);
+
+	it("is not offered on another organization's connection", async () => {
+		await cleanSlack();
+
+		// A different organization's member connected Slack; that account is a
+		// global row, but it is not this organization's connection.
+		const other = await createTestOrganization(`conv-other-${suffix}`);
+		await db.user.create({
+			data: {
+				id: foreignId,
+				name: "Foreign Rep",
+				email: `${foreignId}@example.test`,
+			},
+		});
+		await memberOf(foreignId, other.id);
+		await db.account.create({
+			data: {
+				id: `acc-foreign-${suffix}`,
+				accountId: "U-FOREIGN",
+				providerId: "slack",
+				userId: foreignId,
+				accessToken: "xoxb-foreign",
+			},
+		});
+
+		const resources = await service.builderResources("slack", userId);
+		expect(resources.filter((row) => row.kind === "integration")).toEqual([]);
+	});
+
+	it("appears once this organization is connected", async () => {
+		await db.account.create({
+			data: {
+				id: `acc-ours-${suffix}`,
+				accountId: "U-OURS",
+				providerId: "slack",
+				userId,
+				accessToken: "xoxb-ours",
+			},
+		});
+		await db.slackWorkspaceGrant.create({
+			data: { teamId: `T-${suffix}`, userToken: "xoxp", userScopes: "" },
+		});
+
+		const resources = await service.builderResources("slack", userId);
+		expect(resources.filter((row) => row.kind === "integration")).toEqual([
+			{
+				kind: "integration",
+				id: "slack:workspace",
+				label: "Slack",
+				detail: "Connected workspace",
+				imageUrl: null,
+			},
+		]);
 	});
 });

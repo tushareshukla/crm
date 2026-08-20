@@ -9,7 +9,7 @@ import { DashboardService } from "../src/dashboard/dashboard.service";
 import { DealsService } from "../src/deals/deals.service";
 import { FieldsService } from "../src/fields/fields.service";
 import { withDiscardedCrmEvents } from "./agent-trigger.stub";
-import { afterAll, beforeAll, it, TEST_ORG } from "./tenant";
+import { afterAll, beforeAll, it, memberOf, TEST_ORG } from "./tenant";
 
 const suffix = process.env.TEST_RUN_ID ?? "currency-totals-spec";
 const userId = `user-${suffix}`;
@@ -89,6 +89,7 @@ beforeAll(async () => {
 		},
 		update: {},
 	});
+	await memberOf(userId);
 
 	const company = await db.company.upsert({
 		where: { organizationId_domain: { organizationId: TEST_ORG.id, domain } },
@@ -445,6 +446,7 @@ describe("the dashboard only values what it can convert", () => {
 			},
 			update: {},
 		});
+		await memberOf(analystId);
 	});
 
 	afterAll(async () => {

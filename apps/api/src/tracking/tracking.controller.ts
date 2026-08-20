@@ -1,5 +1,5 @@
 import type { IncomingMessage } from "node:http";
-import { type Db, runWithTenant, withoutTenant } from "@crm/db";
+import { type Db, Prisma, runWithTenant, withoutTenant } from "@crm/db";
 import {
 	EVENT_RETENTION_DAYS,
 	isSiteId,
@@ -164,7 +164,9 @@ export class TrackingRetentionController {
 
 		// Cron. Daily rollups are per organization (they write tenant rows); the
 		// sweeps below are platform housekeeping over rows that are already past
-		// retention, whichever organization they belong to.
+		// retention, whichever organization they belong to — except organizations
+		// whose rollup failed: their events survive until a rollup has counted
+		// them, otherwise the sweep would destroy data the rollup never saw.
 		const rollups = await forEachActiveOrganization(
 			this.db,
 			() => this.rollups.run(before),
@@ -174,7 +176,14 @@ export class TrackingRetentionController {
 			(sum, outcome) => sum + (outcome.ok ? outcome.result : 0),
 			0,
 		);
-		const { removed, complete } = await this.sweepEvents(before);
+		const failedRollups = rollups.filter((outcome) => !outcome.ok);
+		const failedOrganizations = failedRollups.map(
+			(outcome) => outcome.org.slug,
+		);
+		const { removed, complete } = await this.sweepEvents(
+			before,
+			failedRollups.map((outcome) => outcome.org.id),
+		);
 		const visitors = await this.sweepVisitors(before);
 		const counters = await withoutTenant(() => this.counters.sweep());
 
@@ -194,16 +203,32 @@ export class TrackingRetentionController {
 			complete,
 			visitors,
 			counters,
+			failedOrganizations,
 			retentionDays: EVENT_RETENTION_DAYS,
 		});
 
-		return { rolled, removed, complete, visitors, counters };
+		return {
+			rolled,
+			removed,
+			complete,
+			visitors,
+			counters,
+			failedOrganizations,
+		};
 	}
 
 	private async sweepEvents(
 		before: Date,
+		skipOrganizationIds: string[],
 	): Promise<{ removed: number; complete: boolean }> {
 		let removed = 0;
+
+		// An organization whose rollup failed keeps its expired events; they are
+		// swept on a later run once a rollup has aggregated them.
+		const skip =
+			skipOrganizationIds.length > 0
+				? Prisma.sql`AND "organizationId" NOT IN (${Prisma.join(skipOrganizationIds)})`
+				: Prisma.empty;
 
 		for (let pass = 0; pass < MAX_SWEEP_PASSES; pass += 1) {
 			const deleted = await this.db.$executeRaw`
@@ -211,6 +236,7 @@ export class TrackingRetentionController {
 				WHERE "id" IN (
 					SELECT "id" FROM "trackedEvent"
 					WHERE "occurredAt" < ${before}
+					${skip}
 					LIMIT ${SWEEP_BATCH}
 				);
 			`;

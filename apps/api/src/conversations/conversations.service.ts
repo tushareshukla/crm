@@ -188,52 +188,67 @@ export class ConversationsService {
 			? { contains: search, mode: "insensitive" as const }
 			: undefined;
 
-		const [companies, contacts, deals, slackAccount] = await Promise.all([
-			this.db.company.findMany({
-				where: contains ? { name: contains } : undefined,
-				orderBy: { lastActivityAt: { sort: "desc", nulls: "last" } },
-				take: 6,
-				select: { id: true, name: true, domain: true, logoUrl: true },
-			}),
-			this.db.contact.findMany({
-				where: contains
-					? {
-							OR: [
-								{ firstName: contains },
-								{ lastName: contains },
-								{ email: contains },
-							],
-						}
-					: undefined,
-				orderBy: { lastActivityAt: { sort: "desc", nulls: "last" } },
-				take: 6,
-				select: {
-					id: true,
-					firstName: true,
-					lastName: true,
-					email: true,
-					imageUrl: true,
-					company: { select: { name: true } },
-				},
-			}),
-			this.db.deal.findMany({
-				where: contains ? { name: contains } : undefined,
-				orderBy: { lastActivityAt: { sort: "desc", nulls: "last" } },
-				take: 6,
-				select: {
-					id: true,
-					name: true,
-					company: { select: { name: true, logoUrl: true } },
-				},
-			}),
-			this.db.account.findFirst({
-				where: { providerId: "slack", accessToken: { not: null } },
-				select: { id: true },
-			}),
-		]);
+		const [companies, contacts, deals, slackAccount, slackGrant, slackInstall] =
+			await Promise.all([
+				this.db.company.findMany({
+					where: contains ? { name: contains } : undefined,
+					orderBy: { lastActivityAt: { sort: "desc", nulls: "last" } },
+					take: 6,
+					select: { id: true, name: true, domain: true, logoUrl: true },
+				}),
+				this.db.contact.findMany({
+					where: contains
+						? {
+								OR: [
+									{ firstName: contains },
+									{ lastName: contains },
+									{ email: contains },
+								],
+							}
+						: undefined,
+					orderBy: { lastActivityAt: { sort: "desc", nulls: "last" } },
+					take: 6,
+					select: {
+						id: true,
+						firstName: true,
+						lastName: true,
+						email: true,
+						imageUrl: true,
+						company: { select: { name: true } },
+					},
+				}),
+				this.db.deal.findMany({
+					where: contains ? { name: contains } : undefined,
+					orderBy: { lastActivityAt: { sort: "desc", nulls: "last" } },
+					take: 6,
+					select: {
+						id: true,
+						name: true,
+						company: { select: { name: true, logoUrl: true } },
+					},
+				}),
+				this.db.account.findFirst({
+					// Account is a global better-auth row: only a connection made by
+					// a member of this organization counts here.
+					where: {
+						providerId: "slack",
+						accessToken: { not: null },
+						user: { members: { some: { organizationId: workspaceId() } } },
+					},
+					select: { id: true },
+				}),
+				this.db.slackWorkspaceGrant.findFirst({ select: { id: true } }),
+				this.db.slackInstallation.findFirst({ select: { id: true } }),
+			]);
+
+		// Connected for this organization: a member's account plus this
+		// organization's own grant (or in-flight installation).
+		const slackConnected = Boolean(
+			slackAccount && (slackGrant || slackInstall),
+		);
 
 		return [
-			...(slackAccount && (!search || "slack".includes(search.toLowerCase()))
+			...(slackConnected && (!search || "slack".includes(search.toLowerCase()))
 				? [
 						{
 							kind: "integration" as const,

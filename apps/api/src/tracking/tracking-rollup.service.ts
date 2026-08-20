@@ -23,7 +23,7 @@ export class TrackingRollupService {
 			WHERE "organizationId" = ${organizationId}
 				AND "occurredAt" < ${before} AND "type" = 'page_view'
 			GROUP BY 2, 3, 4
-			ON CONFLICT ("day", "host", "path") DO UPDATE
+			ON CONFLICT ("organizationId", "day", "host", "path") DO UPDATE
 			SET "views" = GREATEST("trackedPageDaily"."views", EXCLUDED."views"),
 				"visitors" = GREATEST("trackedPageDaily"."visitors", EXCLUDED."visitors");
 		`;

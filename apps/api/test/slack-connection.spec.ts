@@ -1,11 +1,22 @@
 import { describe, expect } from "bun:test";
 import type { WorkspaceRole } from "@crm/auth";
-import type { Db, Prisma } from "@crm/db";
+import { type Db, db, type Prisma } from "@crm/db";
 import type { AgentAccessService } from "../src/agent/agent-access.service";
 import type { AgentTriggerService } from "../src/agent/agent-trigger.service";
 import type { SlackChannelsService } from "../src/slack/slack-channels.service";
 import { SlackConnectionService } from "../src/slack/slack-connection.service";
-import { it, TEST_ORG } from "./tenant";
+import {
+	afterAll,
+	beforeAll,
+	createTestOrganization,
+	deleteTestOrganization,
+	it,
+	memberOf,
+	runWithTenant,
+	TEST_ORG,
+	type TestOrganization,
+	withoutTenant,
+} from "./tenant";
 
 const userId = "crm-1";
 
@@ -32,17 +43,20 @@ function serviceFor(input: {
 		leasedUntil: Date | null;
 	};
 	grant?: boolean;
+	installation?: boolean;
 	role?: WorkspaceRole;
 }) {
 	const requested: Array<{ reason: string; required: boolean | undefined }> =
 		[];
 	const deleted: string[] = [];
 	const memberQueries: Prisma.MemberFindManyArgs[] = [];
+	const accountQueries: Prisma.AccountFindFirstArgs[] = [];
 	const tx = {
 		account: {
-			deleteMany: async () => {
+			findMany: async () => [],
+			delete: async () => {
 				deleted.push("account");
-				return { count: input.accountUpdatedAt ? 1 : 0 };
+				return { id: "account-1" };
 			},
 		},
 		slackChannel: {
@@ -51,29 +65,47 @@ function serviceFor(input: {
 				return { count: 0 };
 			},
 		},
+		slackMemberMatch: {
+			deleteMany: async () => {
+				deleted.push("slackMemberMatch");
+				return { count: 0 };
+			},
+		},
 		slackWorkspaceGrant: {
 			deleteMany: async () => {
 				deleted.push("slackWorkspaceGrant");
-				return { count: 0 };
+				return { count: input.grant ? 1 : 0 };
+			},
+		},
+		slackInstallation: {
+			deleteMany: async () => {
+				deleted.push("slackInstallation");
+				return { count: input.installation ? 1 : 0 };
 			},
 		},
 	};
 	const db = {
 		$transaction: async <T>(run: (client: typeof tx) => Promise<T>) => run(tx),
 		account: {
-			findFirst: async () =>
-				input.accountUpdatedAt
+			findFirst: async (args: Prisma.AccountFindFirstArgs) => {
+				accountQueries.push(args);
+				return input.accountUpdatedAt
 					? {
 							id: "account-1",
 							accountId: "slack-user",
 							updatedAt: input.accountUpdatedAt,
 						}
-					: null,
+					: null;
+			},
 		},
 		agentDefinition: { findMany: async () => input.agents ?? [] },
 		slackMemberMatch: { findMany: async () => input.matches ?? [] },
 		slackWorkspaceGrant: {
-			findFirst: async () => (input.grant ? { id: "grant-1" } : null),
+			findFirst: async () =>
+				input.grant ? { id: "grant-1", teamName: "Spec Team" } : null,
+		},
+		slackInstallation: {
+			findFirst: async () => (input.installation ? { id: "install-1" } : null),
 		},
 		member: {
 			count: async () => input.memberCount ?? 0,
@@ -101,6 +133,7 @@ function serviceFor(input: {
 		requested,
 		deleted,
 		memberQueries,
+		accountQueries,
 	};
 }
 
@@ -109,6 +142,7 @@ describe("Slack connection", () => {
 		const connectedAt = new Date("2026-08-10T10:00:00.000Z");
 		const { service, requested } = serviceFor({
 			accountUpdatedAt: connectedAt,
+			grant: true,
 			memberCount: 2,
 			matches: [
 				{
@@ -135,6 +169,7 @@ describe("Slack connection", () => {
 		const reviewedAt = new Date("2026-08-10T10:00:01.000Z");
 		const { service, requested } = serviceFor({
 			accountUpdatedAt: connectedAt,
+			grant: true,
 			memberCount: 2,
 			matches: [
 				{ slackUserId: "U1", updatedAt: reviewedAt },
@@ -272,10 +307,193 @@ describe("Slack connection", () => {
 	it("disconnects the workspace for an admin", async () => {
 		const { service, deleted } = serviceFor({
 			accountUpdatedAt: new Date("2026-08-10T10:00:00.000Z"),
+			grant: true,
 			role: "admin",
 		});
 
 		expect(await service.disconnect(userId)).toEqual({ disconnected: true });
-		expect(deleted).toEqual(["account", "slackChannel", "slackWorkspaceGrant"]);
+		expect(deleted).toEqual([
+			"slackWorkspaceGrant",
+			"slackInstallation",
+			"slackChannel",
+			"slackMemberMatch",
+		]);
+	});
+
+	it("does not report another organization's connection as this one's", async () => {
+		// A member's global Slack account exists, but this organization has no
+		// grant or installation of its own: not connected here.
+		const { service, requested, accountQueries } = serviceFor({
+			accountUpdatedAt: new Date("2026-08-10T10:00:00.000Z"),
+			memberCount: 1,
+		});
+
+		const status = await service.status(userId);
+
+		expect(status.connected).toBe(false);
+		expect(status.workspace).toBeNull();
+		expect(status.lastConnectedAt).toBeNull();
+		expect(status.scopes).toEqual([]);
+		expect(requested).toEqual([]);
+
+		// And the account read itself never leaves this organization's members.
+		expect(accountQueries).toHaveLength(1);
+		expect(accountQueries[0]).toMatchObject({
+			where: {
+				providerId: "slack",
+				user: { members: { some: { organizationId: TEST_ORG.id } } },
+			},
+		});
+	});
+
+	it("refuses a people refresh when this organization is not connected", async () => {
+		const { service, requested, accountQueries } = serviceFor({
+			accountUpdatedAt: new Date("2026-08-10T10:00:00.000Z"),
+		});
+
+		await expect(service.refreshPeople(userId)).rejects.toThrow(
+			"Slack is not connected.",
+		);
+		expect(requested).toEqual([]);
+		expect(accountQueries[0]).toMatchObject({
+			where: {
+				providerId: "slack",
+				user: { members: { some: { organizationId: TEST_ORG.id } } },
+			},
+		});
+	});
+});
+
+describe("disconnecting is scoped to the organization", () => {
+	const suffix = process.env.TEST_RUN_ID ?? "slack-disc";
+	const soloId = `slack-solo-${suffix}`;
+	const sharedId = `slack-shared-${suffix}`;
+
+	let orgA: TestOrganization;
+	let orgB: TestOrganization;
+
+	const service = new SlackConnectionService(
+		db,
+		{
+			slackPeopleRequested: async () => undefined,
+		} as unknown as AgentTriggerService,
+		{} as SlackChannelsService,
+		{ assertMember: async () => "admin" } as unknown as AgentAccessService,
+	);
+
+	async function clean() {
+		await deleteTestOrganization({ id: `org-slack-a-${suffix}` });
+		await deleteTestOrganization({ id: `org-slack-b-${suffix}` });
+		await withoutTenant(() =>
+			db.user.deleteMany({ where: { id: { in: [soloId, sharedId] } } }),
+		);
+	}
+
+	beforeAll(async () => {
+		await clean();
+		orgA = await createTestOrganization(`slack-a-${suffix}`);
+		orgB = await createTestOrganization(`slack-b-${suffix}`);
+
+		await db.user.createMany({
+			data: [
+				{ id: soloId, name: "Solo", email: `solo@slack-${suffix}.test` },
+				{ id: sharedId, name: "Shared", email: `shared@slack-${suffix}.test` },
+			],
+		});
+		// Solo works in organization A only; Shared works in both, and carries
+		// organization B's Slack connection.
+		await memberOf(soloId, orgA.id);
+		await memberOf(sharedId, orgA.id);
+		await memberOf(sharedId, orgB.id);
+
+		await db.account.createMany({
+			data: [
+				{
+					id: `acc-solo-${suffix}`,
+					accountId: "U-SOLO",
+					providerId: "slack",
+					userId: soloId,
+					accessToken: "xoxb-solo",
+				},
+				{
+					id: `acc-shared-${suffix}`,
+					accountId: "U-SHARED",
+					providerId: "slack",
+					userId: sharedId,
+					accessToken: "xoxb-shared",
+				},
+			],
+		});
+
+		await runWithTenant(orgA.id, async () => {
+			await db.slackWorkspaceGrant.create({
+				data: { teamId: "T-A", userToken: "xoxp-a", userScopes: "" },
+			});
+			await db.slackChannel.create({ data: { id: "C-A", name: "general" } });
+			await db.slackMemberMatch.create({
+				data: { crmUserId: soloId, slackUserId: "U-SOLO" },
+			});
+		});
+		await runWithTenant(orgB.id, async () => {
+			await db.slackWorkspaceGrant.create({
+				data: { teamId: "T-B", userToken: "xoxp-b", userScopes: "" },
+			});
+			await db.slackChannel.create({ data: { id: "C-B", name: "general" } });
+			await db.slackMemberMatch.create({
+				data: { crmUserId: sharedId, slackUserId: "U-SHARED" },
+			});
+		});
+	});
+
+	afterAll(clean);
+
+	it("removes only this organization's rows and spares accounts other organizations depend on", async () => {
+		expect(
+			await runWithTenant(orgA.id, () => service.disconnect(soloId)),
+		).toEqual({ disconnected: true });
+
+		// Organization A's Slack state is gone…
+		await runWithTenant(orgA.id, async () => {
+			expect(await db.slackWorkspaceGrant.count()).toBe(0);
+			expect(await db.slackChannel.count()).toBe(0);
+			expect(await db.slackMemberMatch.count()).toBe(0);
+		});
+
+		// …organization B's is untouched.
+		await runWithTenant(orgB.id, async () => {
+			expect(await db.slackWorkspaceGrant.count()).toBe(1);
+			expect(await db.slackChannel.count()).toBe(1);
+			expect(await db.slackMemberMatch.count()).toBe(1);
+		});
+
+		// Solo's account served only organization A: deleted. Shared's account
+		// still serves organization B's connection: kept.
+		const accounts = await withoutTenant(() =>
+			db.account.findMany({
+				where: { providerId: "slack", userId: { in: [soloId, sharedId] } },
+				select: { userId: true },
+			}),
+		);
+		expect(accounts.map((account) => account.userId)).toEqual([sharedId]);
+	});
+
+	it("deletes the shared account once no other organization needs it", async () => {
+		expect(
+			await runWithTenant(orgB.id, () => service.disconnect(sharedId)),
+		).toEqual({ disconnected: true });
+
+		expect(
+			await withoutTenant(() =>
+				db.account.count({
+					where: { providerId: "slack", userId: { in: [soloId, sharedId] } },
+				}),
+			),
+		).toBe(0);
+	});
+
+	it("says so when there is nothing to disconnect", async () => {
+		await expect(
+			runWithTenant(orgA.id, () => service.disconnect(soloId)),
+		).rejects.toThrow("Slack is not connected.");
 	});
 });

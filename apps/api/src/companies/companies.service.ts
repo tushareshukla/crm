@@ -281,6 +281,8 @@ export class CompaniesService {
 	}
 
 	async create(input: CompanyCreateInput) {
+		await requireOwner(this.db, input.ownerId);
+
 		const domain = normalizeDomain(input.domain);
 
 		if (domain) {
@@ -353,6 +355,7 @@ export class CompaniesService {
 			data.linkedinUrl = blankToNull(input.linkedinUrl);
 		}
 		if (input.ownerId !== undefined) {
+			await requireOwner(this.db, input.ownerId);
 			data.owner = input.ownerId
 				? { connect: { id: input.ownerId } }
 				: { disconnect: true };

@@ -275,6 +275,8 @@ export class ContactsService {
 	}
 
 	async create(input: ContactCreateInput) {
+		await requireOwner(this.db, input.ownerId);
+
 		const email = normalizeEmail(input.email ?? "");
 
 		if (email) {
@@ -439,6 +441,7 @@ export class ContactsService {
 				: { disconnect: true };
 		}
 		if (input.ownerId !== undefined) {
+			await requireOwner(this.db, input.ownerId);
 			data.owner = input.ownerId
 				? { connect: { id: input.ownerId } }
 				: { disconnect: true };
