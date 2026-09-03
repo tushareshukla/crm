@@ -229,7 +229,7 @@ describe("deal list presentation", () => {
 		const second = dealListResultOf({
 			...output,
 			asOf: "2026-08-06T01:15:00.000Z",
-			deals: [deal, { ...deal, id: "deal-2", name: "Linear — Comp AI" }],
+			deals: [deal, { ...deal, id: "deal-2", name: "Linear — ribeu" }],
 		});
 		if (!first || !second) throw new Error("Expected valid deal list results");
 

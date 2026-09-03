@@ -14,7 +14,7 @@
 <h1 align="center">CRM</h1>
 
 <p align="center">
-  <strong>Comp AI CRM is an open source, CRM designed for AI agents.</strong><br>
+  <strong>ribeu CRM is an open source, CRM designed for AI agents.</strong><br>
   Agentic-first CRM.
 </p>
 

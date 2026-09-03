@@ -43,7 +43,7 @@ export function LandingFooter() {
 							target="_blank"
 							className="font-medium text-foreground"
 						>
-							Comp AI
+							ribeu
 						</Link>
 					</p>
 

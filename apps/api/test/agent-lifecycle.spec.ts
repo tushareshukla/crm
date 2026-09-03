@@ -11,7 +11,7 @@ const teammateId = `agent-lifecycle-teammate-${suffix}`;
 const memberId = `agent-lifecycle-member-${suffix}`;
 const teammateMemberId = `agent-lifecycle-teammate-member-${suffix}`;
 const joinChannel = `renewals-${suffix}`;
-const joinReason = `Add Comp AI to #${joinChannel}`;
+const joinReason = `Add ribeu to #${joinChannel}`;
 const access = new AgentAccessService(db);
 const agents = new AgentDefinitionsService(
 	db,

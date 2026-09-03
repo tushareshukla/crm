@@ -147,7 +147,7 @@ export class AgentTriggerService {
 		return this.enqueue(
 			{
 				kind: "slack-channel-join",
-				reason: `Add Comp AI to #${channelName}`,
+				reason: `Add ribeu to #${channelName}`,
 				priority: PRIORITY.slackJoin,
 				budget: 1,
 				subject: { path: ["channelId"], value: channelId },
