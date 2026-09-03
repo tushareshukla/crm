@@ -16,6 +16,7 @@ const real = {
 	nodeEnv: process.env.NODE_ENV,
 	disabled: process.env.CRM_TELEMETRY_DISABLED,
 	doNotTrack: process.env.DO_NOT_TRACK,
+	enabled: process.env.CRM_TELEMETRY_ENABLED,
 };
 
 let calls: { url: string; body: JsonValue }[] = [];
@@ -58,6 +59,7 @@ beforeEach(() => {
 	forgetInstall();
 
 	process.env.NODE_ENV = "development";
+	process.env.CRM_TELEMETRY_ENABLED = "1";
 	delete process.env.CRM_TELEMETRY_DISABLED;
 	delete process.env.DO_NOT_TRACK;
 });
@@ -70,6 +72,7 @@ afterEach(() => {
 	restore("NODE_ENV", real.nodeEnv);
 	restore("CRM_TELEMETRY_DISABLED", real.disabled);
 	restore("DO_NOT_TRACK", real.doNotTrack);
+	restore("CRM_TELEMETRY_ENABLED", real.enabled);
 });
 
 function restore(name: string, value: string | undefined): void {
