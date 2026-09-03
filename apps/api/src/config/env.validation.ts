@@ -128,6 +128,14 @@ export class EnvironmentVariables {
 	@IsString()
 	CRM_TELEMETRY_DISABLED?: string;
 
+	@IsOptional()
+	@IsString()
+	CRM_TELEMETRY_ENABLED?: string;
+
+	@IsOptional()
+	@IsString()
+	POSTHOG_KEY?: string;
+
 	/** Comma-separated emails allowed into /admin and into any organization (support mode). */
 	@IsOptional()
 	@IsString()

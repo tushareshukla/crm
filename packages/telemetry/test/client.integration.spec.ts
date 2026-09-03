@@ -17,6 +17,7 @@ const real = {
 	disabled: process.env.CRM_TELEMETRY_DISABLED,
 	doNotTrack: process.env.DO_NOT_TRACK,
 	enabled: process.env.CRM_TELEMETRY_ENABLED,
+	key: process.env.POSTHOG_KEY,
 };
 
 let calls: { url: string; body: JsonValue }[] = [];
@@ -60,6 +61,7 @@ beforeEach(() => {
 
 	process.env.NODE_ENV = "development";
 	process.env.CRM_TELEMETRY_ENABLED = "1";
+	process.env.POSTHOG_KEY = "phc_test_key";
 	delete process.env.CRM_TELEMETRY_DISABLED;
 	delete process.env.DO_NOT_TRACK;
 });
@@ -73,6 +75,7 @@ afterEach(() => {
 	restore("CRM_TELEMETRY_DISABLED", real.disabled);
 	restore("DO_NOT_TRACK", real.doNotTrack);
 	restore("CRM_TELEMETRY_ENABLED", real.enabled);
+	restore("POSTHOG_KEY", real.key);
 });
 
 function restore(name: string, value: string | undefined): void {

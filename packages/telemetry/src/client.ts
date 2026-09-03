@@ -29,10 +29,17 @@ function posthog(): PostHog | null {
 	if (built) return client;
 	built = true;
 
+	const key = (process.env.POSTHOG_KEY ?? POSTHOG_KEY).trim();
+
+	if (key === "") {
+		debug("No PostHog project key — every capture is a no-op.");
+		return client;
+	}
+
 	const off = telemetryDisabled();
 
 	try {
-		client = new PostHog(POSTHOG_KEY, {
+		client = new PostHog(key, {
 			host: POSTHOG_HOST,
 			flushAt: 1,
 			flushInterval: 0,
