@@ -1,26 +1,25 @@
 import { describe, expect, it } from "bun:test";
-import { analyticsAllowed } from "../lib/analytics";
+import { ANALYTICS_HOSTS, analyticsAllowed } from "../lib/analytics";
 
 describe("analyticsAllowed", () => {
-	it("allows the two hosts the landing page is served from", () => {
-		expect(analyticsAllowed("trycrm.ai")).toBe(true);
-		expect(analyticsAllowed("www.trycrm.ai")).toBe(true);
+	it("allows nothing, because this fork ships browser analytics off", () => {
+		expect(ANALYTICS_HOSTS).toEqual([]);
 	});
 
-	it("ignores case and surrounding whitespace", () => {
-		expect(analyticsAllowed(" TryCRM.ai ")).toBe(true);
+	it("refuses every host, so posthog-js is never loaded", () => {
+		for (const host of [
+			"trycrm.ai",
+			"www.trycrm.ai",
+			" TryCRM.ai ",
+			"crm.acme.com",
+			"localhost",
+			"crm-git-lewis-telemetry.vercel.app",
+		]) {
+			expect(analyticsAllowed(host)).toBe(false);
+		}
 	});
 
-	it("refuses a self-hosted install serving the same page", () => {
-		expect(analyticsAllowed("crm.acme.com")).toBe(false);
-		expect(analyticsAllowed("localhost")).toBe(false);
-	});
-
-	it("refuses a preview deployment", () => {
-		expect(analyticsAllowed("crm-git-lewis-telemetry.vercel.app")).toBe(false);
-	});
-
-	it("refuses a host that merely ends in the marketing domain", () => {
+	it("still refuses a look-alike host if somebody re-enables one", () => {
 		expect(analyticsAllowed("evil-trycrm.ai")).toBe(false);
 		expect(analyticsAllowed("trycrm.ai.attacker.com")).toBe(false);
 	});

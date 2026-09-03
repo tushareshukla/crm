@@ -28,7 +28,11 @@ export {
 	resetTelemetryClient,
 	shutdownTelemetry,
 } from "./client";
-export { DISABLE_VARIABLES, telemetryDisabled } from "./disabled";
+export {
+	DISABLE_VARIABLES,
+	ENABLE_VARIABLE,
+	telemetryDisabled,
+} from "./disabled";
 export {
 	AGENT_ERROR,
 	API_ERROR,
