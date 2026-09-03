@@ -244,11 +244,11 @@ describe("rootMessageId", () => {
 	it("gives two mailboxes' copies of one conversation the same root", () => {
 		const repA = [
 			{ name: "References", value: "<root@acme.com>" },
-			{ name: "Message-ID", value: "<reply-a@trycomp.ai>" },
+			{ name: "Message-ID", value: "<reply-a@ribeu.com>" },
 		];
 		const repB = [
-			{ name: "References", value: "<root@acme.com> <reply-a@trycomp.ai>" },
-			{ name: "Message-ID", value: "<reply-b@trycomp.ai>" },
+			{ name: "References", value: "<root@acme.com> <reply-a@ribeu.com>" },
+			{ name: "Message-ID", value: "<reply-b@ribeu.com>" },
 		];
 
 		expect(rootMessageId(repA)).toBe(rootMessageId(repB));
@@ -259,13 +259,13 @@ describe("rootMessageIdFrom", () => {
 	it("gives a Gmail copy and an Outlook copy of one thread the same root", () => {
 		const viaGmailHeaders = rootMessageId([
 			{ name: "References", value: "<root@acme.com> <second@acme.com>" },
-			{ name: "Message-ID", value: "<third@trycomp.ai>" },
+			{ name: "Message-ID", value: "<third@ribeu.com>" },
 		]);
 
 		const viaGraphFields = rootMessageIdFrom({
 			references: "<root@acme.com> <second@acme.com>",
 			inReplyTo: "<second@acme.com>",
-			messageId: "<fourth@trycomp.ai>",
+			messageId: "<fourth@ribeu.com>",
 		});
 
 		expect(viaGraphFields).toBe("root@acme.com");
@@ -293,7 +293,7 @@ describe("rootMessageIdFrom", () => {
 			rootMessageIdFrom({
 				references: null,
 				inReplyTo: "<a@acme.com> <b@acme.com>",
-				messageId: "<reply@trycomp.ai>",
+				messageId: "<reply@ribeu.com>",
 			}),
 		).toBe("a@acme.com");
 	});
@@ -302,12 +302,12 @@ describe("rootMessageIdFrom", () => {
 		const listed = rootMessageIdFrom({
 			references: null,
 			inReplyTo: "<a@acme.com>\r\n\t<b@acme.com>",
-			messageId: "<reply-a@trycomp.ai>",
+			messageId: "<reply-a@ribeu.com>",
 		});
 		const single = rootMessageIdFrom({
 			references: null,
 			inReplyTo: "<a@acme.com>",
-			messageId: "<reply-b@trycomp.ai>",
+			messageId: "<reply-b@ribeu.com>",
 		});
 
 		expect(listed).toBe("a@acme.com");

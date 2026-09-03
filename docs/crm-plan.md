@@ -1127,7 +1127,7 @@ schema, two entry points.
 ### The data table, and its rules
 
 Ported from `/Users/lewiscarhart/mvp/apps/app/components/data-table/`, rewriting
-`@trycompai/ui` → `@crm/ui`:
+`@tusharrXop/ui` → `@crm/ui`:
 
 | Source | Destination |
 | --- | --- |

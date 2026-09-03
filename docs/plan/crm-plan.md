@@ -422,7 +422,7 @@ package isn't installed in this checkout yet, so the names are unverified.
 ### The data table
 
 Port these from `/Users/lewiscarhart/mvp/apps/app/components/data-table/`,
-rewriting `@trycompai/ui` → `@crm/ui`:
+rewriting `@tusharrXop/ui` → `@crm/ui`:
 
 | Source | Destination |
 | --- | --- |

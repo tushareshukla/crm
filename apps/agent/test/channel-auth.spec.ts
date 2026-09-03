@@ -60,7 +60,7 @@ function claims(overrides: Partial<BridgeClaims> = {}): BridgeClaims {
 		iss: BRIDGE_ISSUER,
 		aud: BRIDGE_AUDIENCE,
 		sub: "user_123",
-		email: "lewis@trycomp.ai",
+		email: "lewis@ribeu.com",
 		name: "Lewis Carhart",
 		iat: now,
 		nbf: now - 5,
@@ -90,7 +90,7 @@ describe("repFromCrm", () => {
 		const session = await auth(request(await mint(claims())));
 
 		expect(session).toMatchObject({
-			attributes: { email: "lewis@trycomp.ai", name: "Lewis Carhart" },
+			attributes: { email: "lewis@ribeu.com", name: "Lewis Carhart" },
 		});
 	});
 

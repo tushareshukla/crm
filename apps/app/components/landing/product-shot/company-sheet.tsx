@@ -61,7 +61,7 @@ function SheetHeader({ compact }: { compact?: boolean }) {
 						Comp AI
 					</p>
 					<p className="text-muted-foreground text-xs/[162.5%]">
-						trycomp.ai · Compliance
+						ribeu.com · Compliance
 					</p>
 				</div>
 

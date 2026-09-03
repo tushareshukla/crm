@@ -48,9 +48,9 @@ function daysFromNow(days: number, jitterHours = 0): Date {
 }
 
 const OWNERS = [
-	{ name: "Ada Okafor", email: "ada@trycomp.ai" },
-	{ name: "Marcus Lindqvist", email: "marcus@trycomp.ai" },
-	{ name: "Priya Raman", email: "priya@trycomp.ai" },
+	{ name: "Ada Okafor", email: "ada@ribeu.com" },
+	{ name: "Marcus Lindqvist", email: "marcus@ribeu.com" },
+	{ name: "Priya Raman", email: "priya@ribeu.com" },
 ] as const;
 
 type SeedCompany = {

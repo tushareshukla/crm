@@ -72,7 +72,7 @@ function harness(options: {
 				await new Promise((resolve) => setTimeout(resolve, options.meDelayMs));
 			}
 			meResolvedAt.value = Date.now();
-			return ok({ mail: "rep@trycomp.ai" });
+			return ok({ mail: "rep@ribeu.com" });
 		},
 		async folder(_token: string, name: string) {
 			return options.folder
@@ -147,7 +147,7 @@ function message(overrides: Partial<GraphMessage> = {}): GraphMessage {
 		conversationId: "conv-1",
 		subject: "Pricing",
 		from: { emailAddress: { name: "Jane", address: "jane@acme.com" } },
-		toRecipients: [{ emailAddress: { address: "rep@trycomp.ai" } }],
+		toRecipients: [{ emailAddress: { address: "rep@ribeu.com" } }],
 		receivedDateTime: "2025-08-01T09:00:00.000Z",
 		sentDateTime: "2025-08-01T09:00:00.000Z",
 		body: { contentType: "text", content: "Hello" },

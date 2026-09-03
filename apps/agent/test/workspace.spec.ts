@@ -12,7 +12,7 @@ import { usMarkdown, type WorkspaceIdentity } from "../agent/lib/workspace";
 import { it } from "./support/tenant";
 
 const profile: WorkspaceProfile = {
-	website: "trycomp.ai",
+	website: "ribeu.com",
 	narrative:
 		"Comp AI takes a startup from nothing to a SOC 2 or ISO 27001 audit by automating the evidence collection, and sells the platform on an annual subscription.",
 	sections: {
@@ -20,13 +20,13 @@ const profile: WorkspaceProfile = {
 		sellsTo: "Series A to C startups facing their first framework audit",
 		edge: "Getting there in weeks rather than months",
 	},
-	sourceUrl: "https://trycomp.ai",
+	sourceUrl: "https://ribeu.com",
 	refreshedAt: new Date("2026-08-01T00:00:00.000Z"),
 };
 
 const us: WorkspaceIdentity = {
 	name: "Comp AI",
-	website: "trycomp.ai",
+	website: "ribeu.com",
 	profile,
 };
 
@@ -38,12 +38,12 @@ describe("who we are", () => {
 	it("names us, and refuses to invent the rest", () => {
 		const markdown = usMarkdown({
 			name: "Comp AI",
-			website: "trycomp.ai",
+			website: "ribeu.com",
 			profile: null,
 		});
 
 		expect(markdown).toContain("Comp AI");
-		expect(markdown).toContain("trycomp.ai");
+		expect(markdown).toContain("ribeu.com");
 		expect(markdown).toContain("do not guess");
 	});
 
@@ -104,7 +104,7 @@ describe("every session is told who we are", () => {
 
 describe("a profile belongs to the website it was read from", () => {
 	it("is ours while the website is unchanged", () => {
-		expect(profileOf(profile, "trycomp.ai")).toBe(profile);
+		expect(profileOf(profile, "ribeu.com")).toBe(profile);
 	});
 
 	it("is dropped the moment the website changes", () => {
@@ -118,18 +118,18 @@ describe("a profile belongs to the website it was read from", () => {
 
 describe("the website has to be somewhere a fetch can go", () => {
 	it("takes a bare domain and gives back a URL", () => {
-		expect(websiteUrl("trycomp.ai")).toBe("https://trycomp.ai");
-		expect(websiteUrl(" WWW.Trycomp.ai/ ")).toBe("https://www.trycomp.ai");
+		expect(websiteUrl("ribeu.com")).toBe("https://ribeu.com");
+		expect(websiteUrl(" WWW.Ribeu.com/ ")).toBe("https://www.ribeu.com");
 	});
 
 	it("keeps a scheme it can fetch, and a path that means something", () => {
-		expect(websiteUrl("http://trycomp.ai")).toBe("http://trycomp.ai");
-		expect(websiteUrl("https://trycomp.ai/uk/")).toBe("https://trycomp.ai/uk");
+		expect(websiteUrl("http://ribeu.com")).toBe("http://ribeu.com");
+		expect(websiteUrl("https://ribeu.com/uk/")).toBe("https://ribeu.com/uk");
 	});
 
 	it("refuses anything that is not a web address", () => {
 		for (const input of [
-			"httpx://trycomp.ai",
+			"httpx://ribeu.com",
 			"javascript:alert(1)",
 			"file:///etc/passwd",
 			"not a website",

@@ -141,8 +141,8 @@ describe("workDomain", () => {
 
 describe("externalParticipants", () => {
 	const options = {
-		ourDomains: new Set(["trycomp.ai"]),
-		ourAddresses: new Set(["lewis@trycomp.ai"]),
+		ourDomains: new Set(["ribeu.com"]),
+		ourAddresses: new Set(["lewis@ribeu.com"]),
 		suppressedDomains: new Set(["greenhouse.io"]),
 		suppressedEmails: new Set(["deleted@acme.com"]),
 	};
@@ -150,8 +150,8 @@ describe("externalParticipants", () => {
 	it("keeps only the other side of the conversation", () => {
 		const result = externalParticipants(
 			[
-				person("lewis@trycomp.ai"),
-				person("colleague@trycomp.ai"),
+				person("lewis@ribeu.com"),
+				person("colleague@ribeu.com"),
 				person("jane@acme.com", "Jane"),
 			],
 			options,
@@ -191,7 +191,7 @@ describe("externalParticipants", () => {
 
 	it("returns nothing for a wholly internal thread", () => {
 		expect(
-			externalParticipants([person("colleague@trycomp.ai")], options),
+			externalParticipants([person("colleague@ribeu.com")], options),
 		).toEqual([]);
 	});
 
@@ -207,7 +207,7 @@ describe("externalParticipants", () => {
 	it("leaves nothing to file when the deleted contact is the only outsider", () => {
 		expect(
 			externalParticipants(
-				[person("lewis@trycomp.ai"), person("deleted@acme.com")],
+				[person("lewis@ribeu.com"), person("deleted@acme.com")],
 				options,
 			),
 		).toEqual([]);

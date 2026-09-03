@@ -20,7 +20,7 @@ beforeAll(async () => {
 
 const rep = {
 	id: "user_123",
-	email: "lewis@trycomp.ai",
+	email: "lewis@ribeu.com",
 	name: "Lewis Carhart",
 };
 
